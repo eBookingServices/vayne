@@ -1,0 +1,5 @@
+name "vayne"
+description "Run-time template compiler and VM for D"
+authors "Márcio Martins"
+copyright "Copyright © 2016, Márcio Martins"
+license "MIT"
