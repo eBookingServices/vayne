@@ -5,12 +5,15 @@ import std.conv;
 import std.datetime;
 import std.range;
 import std.stdio;
+import std.string;
 import std.traits;
 
 
 import vayne.op;
-public import vayne.value;
+import vayne.value;
 import vayne.source.source;
+
+public import vayne.value : Value;
 
 
 enum VMOptions : uint {
@@ -35,8 +38,18 @@ struct VM(uint options = VMOptions.Default) {
 		size_t line;
 	}
 	alias ErrorHandler = void delegate(Error);
+	alias Globals = Value[string];
 
-	void load(size_t registers, size_t constants,const(Instr)[] instrs, const(SourceLoc)[] locs, const(string)[] sources) {
+	void load(size_t registers, Value[] constants, const(Instr)[] instrs, const(SourceLoc)[] locs, const(string)[] sources) {
+		instrs_ = instrs;
+		locs_ = locs;
+		sources_ = sources;
+		consts_ = constants;
+
+		regs_.length = registers;
+	}
+
+	void load(size_t registers, size_t constants, const(Instr)[] instrs, const(SourceLoc)[] locs, const(string)[] sources) {
 		instrs_ = instrs;
 		locs_ = locs;
 		sources_ = sources;
@@ -53,12 +66,35 @@ struct VM(uint options = VMOptions.Default) {
 		consts_[index] = Value(value);
 	}
 
+	void setGlobals(Globals globals) {
+		globals_ = globals;
+	}
+
+	void bindGlobals(Globals globals) {
+		foreach (k, v; globals)
+			globals_[k] = v;
+	}
+
+	void bindGlobal(T)(string name, ref T value) if (is(T == struct)) {
+		globals_[name] = Value(value);
+	}
+
+	void bindGlobal(T)(string name, in T value)  if (!is(T == struct)) {
+		globals_[name] = Value(value);
+	}
+
 	@property void errorHandler(ErrorHandler handler) {
 		errorHandler_ = handler;
 	}
 
 	@property ErrorHandler errorHandler() const {
 		return errorHandler_;
+	}
+
+	void execute(T)(ref T output, Globals globals) if (isOutputRange!(T, char)) {
+		globals_ = globals;
+
+		execute(output);
 	}
 
 	void execute(T)(ref T output) if (isOutputRange!(T, char)) {
@@ -89,7 +125,7 @@ struct VM(uint options = VMOptions.Default) {
 			}
 
 			try {
-				final switch (op) with (OpCode) {
+				Lswitch: final switch (op) with (OpCode) {
 				case Nop:
 					break;
 				case Halt:
@@ -105,6 +141,20 @@ struct VM(uint options = VMOptions.Default) {
 					static if (options & VMOptions.PrintOutput) {
 						write(getArgV!0.get!string);
 					}
+					break;
+				case PushScope:
+					auto s = getArgV!0;
+					switch (s.type) with (Value.Type) {
+					case Object:
+					case AssocArray:
+						scopes_ ~= getArgV!0;
+						break;
+					default:
+						throw new Exception(format("with statement expressions must be of type %s or %s, not %s", Object, AssocArray, s.type));
+					}
+					break;
+				case PopScope:
+					scopes_.length = scopes_.length - instr.arg!0;
 					break;
 				case Minus:
 					regs_[instr.arg!0].unaryOp!"-";
@@ -190,12 +240,69 @@ struct VM(uint options = VMOptions.Default) {
 				case Key:
 					regs_[instr.arg!0] = getArgV!1.key(getArgV!2);
 					break;
+				case Dispatch:
+					assert(!dispatchArg_);
+
+					auto name = getArgV!2;
+					auto pout = &regs_[instr.arg!0];
+
+					auto obj = getArgV!1;
+					switch (obj.type) with (Value.Type) {
+					case Object:
+					case AssocArray:
+						if (getArgV!1.has(name, pout))
+							break Lswitch;
+						break;
+					default:
+						break;
+					}
+
+					if (name.type == Value.Type.String) {
+						if (auto pvalue = name.get!string in globals_) {
+							if (pvalue.type == Value.Type.Function) {
+								dispatchArg_ = true;
+								*pout = *pvalue;
+								break Lswitch;
+							}
+						}
+					}
+
+					*pout = getArgV!1.get(name);
+					break;
 				case Element:
 					regs_[instr.arg!0] = getArgV!1.get(getArgV!2);
 					break;
+				case LookUp:
+					auto name = getArgV!1;
+					auto pout = &regs_[instr.arg!0];
+
+					foreach_reverse (ref s; scopes_) {
+						if (s.has(name, pout))
+							break Lswitch;
+					}
+
+					if (name.type == Value.Type.String) {
+						if (auto pvalue = name.get!string in globals_) {
+							*pout = *pvalue;
+							break Lswitch;
+						}
+					}
+
+					*pout = Value.init;
+					break;
 				case Call:
-					auto func = getArgV!1.get!(Value.Function);
-					func.wrapper(func.ptr, func.self, regs_[instr.arg!2..instr.arg!2 + instr.arg!3], regs_[instr.arg!0]);
+					auto func = getArgV!1;
+					func.call(regs_[instr.arg!2..instr.arg!2 + instr.arg!3], regs_[instr.arg!0]);
+					break;
+				case DispatchCall:
+					auto func = getArgV!1;
+					if (dispatchArg_) {
+						func.call(regs_[instr.arg!2..instr.arg!2 + instr.arg!3], regs_[instr.arg!0]);
+						dispatchArg_ = false;
+					} else {
+						func.call(regs_[1 + instr.arg!2..instr.arg!2 + instr.arg!3], regs_[instr.arg!0]);
+					}
+					break;
 				}
 
 				if (++ip >= instrs_.length)
@@ -216,9 +323,13 @@ struct VM(uint options = VMOptions.Default) {
 private:
 	Value[] consts_;
 	Value[] regs_;
+	Globals globals_;
+	Value[] scopes_;
+	bool dispatchArg_;
 
 	const(Instr)[] instrs_;
 	const(SourceLoc)[] locs_;
 	const(string)[] sources_;
 
-	ErrorHandler errorHandler_;}
+	ErrorHandler errorHandler_;
+}

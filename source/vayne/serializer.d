@@ -1,93 +1,66 @@
-module vayne.code.serializer;
+module vayne.serializer;
 
 
 import std.algorithm;
 import std.range;
 import std.traits;
 
-import vayne.code.emitter;
-import vayne.source.source;
+import vayne.compiler;
 import vayne.op;
+import vayne.source.source;
 
 
-const(ubyte)[] serialize(ref const(Emitter) emitter, const(string)[] sources) {
+const(ubyte)[] serialize(CompiledCode code) {
 	ByteStreamWriter writer;
 
 	with (writer) {
 		put!uint(MagicString);
 		put!uint(FormatVersion);
 		put!uint(OpCodesVersion);
-		put!uint(emitter.registerCount);
-		put!uint(emitter.constantCount);
+		put!uint(code.registerCount);
 
-		put!ubyte(Chunks.Constants);
-		put!uint(cast(uint)emitter.constants.length);
-		foreach (i, c; emitter.constants) {
-			final switch (c.type) with (Emitter.ConstantSlot.Type) {
-			case Global:
-				put!ubyte(ConstantType.Global);
-				break;
-			case Boolean:
-				put!ubyte(ConstantType.Boolean);
-				break;
-			case Integer:
-				put!ubyte(ConstantType.Integer);
-				break;
-			case Float:
-				put!ubyte(ConstantType.Float);
-				break;
-			case String:
-				put!ubyte(ConstantType.String);
-				break;
+		if (code.constants.length) {
+			put!ubyte(Chunks.Constants);
+			put!uint(cast(uint)code.constants.length);
+			foreach (i, k; code.constants) {
+				put!ubyte(k.type);
+				put!string(k.value);
 			}
-			put!string(c.value);
 		}
 
-		put!ubyte(Chunks.Instructions);
-		put!uint(cast(uint)emitter.instrs.length);
-		foreach (instr; emitter.instrs)
-			put!ulong(instr.code);
-
-		put!ubyte(Chunks.InstructionSourceLocations);
-		put!uint(cast(uint)emitter.locs.length);
-		foreach (loc; emitter.locs) {
-			put!uint(loc.id);
-			put!uint(loc.line);
-			//writer.put!uint(loc.column);
+		if (code.instrs.length) {
+			put!ubyte(Chunks.Instructions);
+			put!uint(cast(uint)code.instrs.length);
+			foreach (instr; code.instrs)
+				put!ulong(instr.code);
 		}
 
-		put!ubyte(Chunks.SourceNames);
-		put!uint(cast(uint)sources.length);
-		foreach (source; sources)
-			put!string(source);
+		if (code.locs.length) {
+			put!ubyte(Chunks.InstructionSourceLocations);
+			put!uint(cast(uint)code.locs.length);
+			foreach (loc; code.locs) {
+				put!uint(loc.id);
+				put!uint(loc.line);
+				//writer.put!uint(loc.column);
+			}
+		}
+
+		if (code.sources.length) {
+			put!ubyte(Chunks.SourceNames);
+			put!uint(cast(uint)code.sources.length);
+			foreach (source; code.sources)
+				put!string(source);
+		}
+
+		if (false && code.dependencies.length) {
+			put!ubyte(Chunks.Dependencies);
+			put!uint(cast(uint)code.dependencies.length);
+			foreach (dependency; code.dependencies)
+				put!string(dependency);
+		}
 	}
 
 	return writer.data;
-}
-
-
-enum ConstantType : ubyte {
-	Global = 0,
-	Boolean,
-	String,
-	Integer,
-	Float,
-}
-
-
-struct CompiledCode {
-	uint registerCount;
-	uint constantCount;
-
-	const(Instr)[] instrs;
-	const(SourceLoc)[] locs;
-	string[] sources;
-	Constant[] constants;
-
-	static struct Constant {
-		ConstantType type;
-		string value;
-	}
 }
 
 
@@ -100,7 +73,6 @@ CompiledCode unserialize(const(ubyte)[] bytes) {
 		auto format = take!uint;
 		auto opcodes = take!uint;
 		result.registerCount = take!uint;
-		result.constantCount = take!uint;
 
 		assert(magic == MagicString);
 		assert(format == FormatVersion);
@@ -143,6 +115,13 @@ CompiledCode unserialize(const(ubyte)[] bytes) {
 				foreach (i; 0..count)
 					result.sources ~= take!string;
 				break;
+			case Dependencies:
+				assert(result.dependencies.empty);
+				auto count = take!uint;
+				result.dependencies.reserve(count);
+				foreach (i; 0..count)
+					result.dependencies ~= take!string;
+				break;
 			}
 		}
 	}
@@ -158,6 +137,7 @@ enum Chunks : ubyte {
 	Constants,
 	InstructionSourceLocations,
 	SourceNames,
+	Dependencies,
 }
 
 

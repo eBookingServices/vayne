@@ -72,6 +72,7 @@ private:
 		insert_ = new StatementBlock(Token(context.loc));
 
 		const end = source.buffer.length - 2;
+
 		while (context.cursor < end) {
 			auto remaining = context.remaining();
 			auto indexOpen = remaining.indexOf("{{");
@@ -81,28 +82,31 @@ private:
 			escaper(context, remaining[0..indexOpen]);
 			context.advance(indexOpen);
 
-			const contentStart = indexOpen + 2;
-			auto indexClose = remaining.indexOf("}}", contentStart);
+			const triple = ((indexOpen + 1 < remaining.length) && (remaining[indexOpen + 2] == '{'));
+			const open = triple ? "{{{" : "{{";
+			const contentStart = indexOpen + open.length;
+			const close = triple ? "}}}" : "}}";
+			auto indexClose = remaining.indexOf(close, contentStart);
 			while (indexClose != -1) {
 				if (balancedQuotes(remaining[contentStart..indexClose]))
 					break;
 
-				indexClose = remaining.indexOf("}}", indexClose + 2);
+				indexClose = remaining.indexOf(close, indexClose + close.length);
 			}
 
 			if (indexClose == -1)
-				throw new ParserException(context.loc, "missing '}}' to close tag '{{'");
+				throw new ParserException(context.loc, format("missing '%s' to close tag '%s'", close, open));
 
-			context.advance(2);
+			context.advance(close.length);
 			indexClose -= contentStart;
 
 			try {
-				compile(context, source.buffer[context.cursor..context.cursor + indexClose]);
+				compile(context, source.buffer[context.cursor..context.cursor + indexClose], open, close);
 			} catch (ExprParserException error) {
 				throw new ParserException(context.loc, error.msg);
 			}
 
-			context.advance(indexClose + 2);
+			context.advance(indexClose + close.length);
 		}
 		context.expectClosed();
 
@@ -124,38 +128,41 @@ private:
 		return new Module(Token(context.loc), [ insert_ ]);
 	}
 
-	void compile(Context context, string content) {
+	void compile(Context context, string content, string tagOpen, string tagClose) {
 		if (content.length > 0) {
 			auto tag = content[0..1];
 			switch(tag) {
-				case "*":
-					iterate(context, content);
-					break;
-				case "/":
-					close(context, content);
-					break;
-				case "?":
-					 conditional(context, content);
-					 break;
-				case ":":
-					orElse(context, content);
-					break;
-				case "~":
-					translate(context, content);
-					break;
-				case ";":
-					meta(context, content);
-					break;
-				case "!":
-					break;
-				case "#":
-					define(context, content);
-					break;
-				case "&":
-					break;
-				default:
-					interpolate(context, content);
-					break;
+			case "*":
+				iterate(context, content);
+				break;
+			case "/":
+				close(context, content);
+				break;
+			case "?":
+				 conditional(context, content);
+				 break;
+			case ":":
+				orElse(context, content);
+				break;
+			case "~":
+				translate(context, content, tagOpen.length == 2);
+				break;
+			case ";":
+				meta(context, content);
+				break;
+			case "!":
+				break;
+			case "#":
+				define(context, content);
+				break;
+			case "@":
+				withs(context, content);
+				break;
+			case "&":
+				break;
+			default:
+				interpolate(context, content, tagOpen.length == 2);
+				break;
 			}
 		}
 	}
@@ -165,7 +172,7 @@ private:
 		content = content[1..$].strip();
 
 		auto loopStmt = parseLoop(Source(source_.id, source_.parent, content), context.loc);
-		auto bodyBlock = new StatementBlock(Token(context.loc));
+		auto bodyBlock = create!StatementBlock(Token(context.loc));
 		loopStmt.children[2] = bodyBlock;
 		insert_.children ~= loopStmt;
 
@@ -184,7 +191,7 @@ private:
 		context.open(content[0..1], content[1..$]);
 		content = content[1..$].strip;
 
-		auto ifStmt = new IfStatement(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc), new StatementBlock(Token(context.loc)), null);
+		auto ifStmt = create!IfStatement(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc), create!StatementBlock(Token(context.loc)), null);
 		insert_.children ~= ifStmt;
 
 		insertStack_ ~= insert_;
@@ -202,11 +209,11 @@ private:
 		assert(ifStmt !is null);
 
 		if (content.length) {
-			auto elseIfStmt = new IfStatement(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc), new StatementBlock(Token(context.loc)), null);
+			auto elseIfStmt = create!IfStatement(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc), create!StatementBlock(Token(context.loc)), null);
 			insertStack_ ~= insert_;
 			insert_ = cast(StatementBlock)ifStmt.children[1];
 		} else {
-			auto elseBlock = new StatementBlock(Token(context.loc));
+			auto elseBlock = create!StatementBlock(Token(context.loc));
 			ifStmt.children[2] = elseBlock;
 
 			insertStack_ ~= insert_;
@@ -234,15 +241,48 @@ private:
 	}
 
 	void define(Context context, string content) {
-		insert_.children ~= new Output(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc));
+		//insert_.children ~= new Output(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc));
 	}
 
-	void translate(Context context, string content) {
-		insert_.children ~= new Output(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc));
+	void withs(Context context, string content) {
+		context.open(content[0..1], content[1..$]);
+		content = content[1..$].strip;
+
+		auto args = parseExprList(Source(source_.id, source_.parent, content), context.loc);
+		auto bodyBlock = create!StatementBlock(Token(context.loc));
+		auto withStmt = create!WithStatement(Token(context.loc), cast(Node[])args, bodyBlock);
+		insert_.children ~= withStmt;
+
+		insertStack_ ~= insert_;
+		insert_ = bodyBlock;
 	}
 
-	void interpolate(Context context, string content) {
-		insert_.children ~= new Output(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc));
+	Node escapeHTML(Node text, SourceLoc loc) {
+		auto escape = create!Identifier(Token(Token.Kind.Identifier, "__escape", loc));
+		auto html = cast(Node)create!Constant(Token("html", Token.LiteralKind.String, 0, 0, loc));
+
+		return cast(Node)create!FunctionCall(Token(loc), escape, [ text, html ]);
+	}
+
+	void translate(Context context, string content, bool autoEscape) {
+		content = content[1..$].strip;
+
+		auto args = cast(Node[])parseExprList(Source(source_.id, source_.parent, content), context.loc);
+		auto translateFunc = create!Identifier(Token(Token.Kind.Identifier, "__translate", context.loc));
+
+		auto translated = cast(Node)create!FunctionCall(Token(context.loc), translateFunc, args);
+		if (autoEscape)
+			translated = escapeHTML(translated, context.loc);
+		insert_.children ~= create!Output(Token(context.loc), translated);
+	}
+
+	void interpolate(Context context, string content, bool autoEscape) {
+		auto args = cast(Node[])parseExprList(Source(source_.id, source_.parent, content), context.loc);
+		foreach (arg; args) {
+			if (autoEscape)
+				arg = escapeHTML(arg, context.loc);
+			insert_.children ~= create!Output(Token(context.loc), arg);
+		}
 	}
 
 	void escaper(Context context, string content) {
@@ -253,7 +293,7 @@ private:
 		}
 
 		if (content.length)
-			insert_.children ~= new Output(Token(context.loc), new Constant(Token(content, Token.LiteralKind.String, 0, 0, context.loc)));
+			insert_.children ~= create!Output(Token(context.loc), create!Constant(Token(content, Token.LiteralKind.String, 0, 0, context.loc)));
 	}
 
 	Source source_;
@@ -283,6 +323,13 @@ auto parseExpr(Source source, SourceLoc loc) {
 }
 
 
+auto parseExprList(Source source, SourceLoc loc) {
+	auto parser = ExprParser(source, loc);
+	parser.warmUp();
+	return parser.parseExpressionList();
+}
+
+
 auto parseLoop(Source source, SourceLoc loc) {
 	auto parser = ExprParser(source, loc);
 	parser.warmUp();
@@ -306,6 +353,24 @@ private struct ExprParser {
 			if (auto cond = parseConditional(expr))
 				return create!Expression(start, cond);
 			return create!Expression(start, expr);
+		}
+		return null;
+	}
+
+	Expression[] parseExpressionList() {
+		if (auto expr = parseExpression) {
+			Expression[] exprs;
+			exprs ~= expr;
+
+			while (tok_.sep(',')) {
+				eat();
+				if (auto next = parseExpression()) {
+					exprs ~= next;
+					continue;
+				}
+				throw new ExprParserException(tok_, format("expected an expression following ',', not %s", tok_));
+			}
+			return exprs;
 		}
 		return null;
 	}
@@ -570,20 +635,7 @@ private struct ExprParser {
 					return null;
 			}
 
-			// rewrite filter to function call
-			if (op.sep("|")) {
-				if (auto ident = cast(Identifier)right) {
-					left = create!FunctionCall(op, ident, [ left ]);
-				} else if (auto call = cast(FunctionCall)right) {
-					++call.children.length;
-					foreach_reverse (i; 2..call.children.length)
-						call.children[i] = call.children[i - 1];
-					call.children[1] = left;
-					left = call;
-				}
-			} else {
-				left = create!BinaryOp(op, left, right);
-			}
+			left = create!BinaryOp(op, left, right);
 		}
 	}
 

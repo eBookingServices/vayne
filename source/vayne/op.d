@@ -19,6 +19,8 @@ enum OpCode : ulong {
 	JumpIfNotZero,
 
 	Move,
+	PushScope,
+	PopScope,
 
 	Increment,
 	Decrement,
@@ -47,9 +49,12 @@ enum OpCode : ulong {
 	Keys,
 	TestKey,
 	Key,
+	Dispatch,
 	Element,
+	LookUp,
 
 	Call,
+	DispatchCall,
 }
 
 
@@ -95,6 +100,7 @@ Instr encode(OpCode op, Args...)(Args args) if (Args.length <= 4) {
 			break;
 		}
 	case Jump:
+	case PopScope:
 		static if (args.length == 1) {
 			assert(args[0].isImmediate);
 			return Instr(base | (cast(ulong)args[0].value << Arg0Shift));
@@ -113,6 +119,7 @@ Instr encode(OpCode op, Args...)(Args args) if (Args.length <= 4) {
 		}
 	case Output:
 	case Throw:
+	case PushScope:
 		static if (args.length == 1) {
 			assert(args[0].isRegisterOrConst);
 			return Instr(base | (cast(ulong)args[0].value << Arg0Shift) | (args[0].isConst ? Arg0ConstMask : 0));
@@ -132,6 +139,7 @@ Instr encode(OpCode op, Args...)(Args args) if (Args.length <= 4) {
 	case Move:
 	case Length:
 	case Keys:
+	case LookUp:
 		static if (args.length == 2) {
 			assert(args[0].isRegister);
 			assert(args[1].isRegisterOrConst);
@@ -156,6 +164,7 @@ Instr encode(OpCode op, Args...)(Args args) if (Args.length <= 4) {
 	case GreaterOrEqual:
 	case TestKey:
 	case Key:
+	case Dispatch:
 	case Element:
 		static if (args.length == 3) {
 			assert(args[0].isRegister);
@@ -166,6 +175,7 @@ Instr encode(OpCode op, Args...)(Args args) if (Args.length <= 4) {
 			break;
 		}
 	case Call:
+	case DispatchCall:
 		static if (args.length == 4) {
 			assert(args[0].isRegister);
 			assert(args[1].isRegisterOrConst);
@@ -279,8 +289,13 @@ struct Instr {
 		case Power:
 		case Concat:
 		case Key:
+		case Dispatch:
 		case Element:
+		case LookUp:
 		case Call:
+		case DispatchCall:
+		case PushScope:
+		case PopScope:
 			return false;
 		case Not:
 		case Test:
@@ -303,6 +318,7 @@ struct Instr {
 		case Halt:
 			return name;
 		case Jump:
+		case PopScope:
 			return format("%s %s", name, arg!0);
 		case Increment:
 		case Decrement:
@@ -310,6 +326,7 @@ struct Instr {
 		case Not:
 		case Output:
 		case Throw:
+		case PushScope:
 			return format("%s %s", name, argName!0);
 		case JumpIfZero:
 		case JumpIfNotZero:
@@ -318,6 +335,7 @@ struct Instr {
 		case Move:
 		case Length:
 		case Keys:
+		case LookUp:
 			return format("%s %s %s", name, argName!0, argName!1);
 		case And:
 		case Or:
@@ -336,8 +354,10 @@ struct Instr {
 		case GreaterOrEqual:
 		case TestKey:
 		case Key:
+		case Dispatch:
 		case Element:
 			return format("%s %s %s %s", name, argName!0, argName!1, argName!2);
+		case DispatchCall:
 		case Call:
 			return format("%s %s %s %s %s", name, argName!0, argName!1, argName!2, arg!3);
 		}

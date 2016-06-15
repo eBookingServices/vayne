@@ -1,4 +1,3 @@
-import std.algorithm;
 import std.array;
 import std.datetime;
 import std.file;
@@ -7,74 +6,18 @@ import std.path;
 import std.stdio;
 import std.string;
 
-import vayne.ast.node;
-import vayne.ast.printer;
-import vayne.code.emitter;
-import vayne.code.serializer;
-import vayne.source.compress;
-import vayne.source.parser;
-import vayne.source.preparser;
-import vayne.source.source;
+
+import vayne.compiler;
+import vayne.serializer;
 
 
-struct CompileOptions {
-	auto preparsePrint = false;
-	auto astPrint = false;
-	auto instrPrint = false;
-	auto constPrint = false;
-	auto lineNumbers = false;
-	auto compress = false;
+const(string)[] compile(string fileName, string target, CompilerOptions options) {
+	auto compiled = vayne.compiler.compile(fileName, options);
 
-	string[] search;
-	string ext = ".html";
-}
-
-const(string)[] compile(string fileName, string target, CompileOptions options) {
-	SourceManagerOptions mgrOptions;
-	mgrOptions.search ~= options.search;
-	mgrOptions.extension = options.ext;
-
-	auto mgr = SourceManager(mgrOptions);
-	auto src = mgr.open(fileName);
-
-	PreParserOptions preOptions;
-	preOptions.lineNumbers = options.lineNumbers;
-
-	mgr.set(src.id, preparse(mgr, src.id, preOptions));
-
-	if (options.preparsePrint)
-		writeln(mgr.get(src.id).buffer);
-
-	ParserOptions parserOptions;
-	parserOptions.compress = options.compress ? CompressOptions.defaults : CompressOptions.none;
-
-	auto ast = parse(mgr, src.id, parserOptions);
-	if (options.astPrint)
-		ast.print.writeln;
-
-	Emitter emitter;
-	emitter.emitModule(cast(Module)ast);
-
-	if (options.constPrint) {
-		foreach (i, k; emitter.constants)
-			writeln(format("%4d %8s %s", i, k.type, k.value));
-	}
-
-	if (options.instrPrint) {
-		if (options.lineNumbers) {
-			foreach (ip, instr; emitter.instrs)
-				writeln(format("%4d %s ; %s", ip, instr, mgr.loc(emitter.locs[ip])));
-		} else {
-			foreach (ip, instr; emitter.instrs)
-				writeln(format("%4d %s", ip, instr));
-		}
-	}
-
-	auto byteCode = serialize(emitter, mgr.sourceNames);
-
+	auto byteCode = serialize(compiled);
 	std.file.write(target, byteCode);
 
-	return mgr.dependencies.map!(x => mgr.fileNames[x]).array;
+	return compiled.dependencies;
 }
 
 
@@ -91,7 +34,7 @@ int main(string[] args) {
 	string outputDir;
 	string depCacheDir;
 
-	CompileOptions compileOptions;
+	CompilerOptions compileOptions;
 
 	try {
 		auto opts = getopt(args,

@@ -145,6 +145,15 @@ class StatementBlock : Node {
 }
 
 
+class WithStatement : Node {
+	this(Token tok, Node[] exprs, Node body_) {
+		super(tok, exprs ~ body_);
+	}
+
+	mixin VisitorInterface;
+}
+
+
 class IfStatement : Node {
 	this(Token tok, Node expr, Node trueCase, Node elseCase) {
 		super(tok, expr, trueCase, elseCase);

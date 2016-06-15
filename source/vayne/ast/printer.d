@@ -42,9 +42,9 @@ class Printer(Appender) : Visitor {
 
 	override void visit(ConditionalExpression node) {
 		node.children[0].accept(this);
-		app.put(" ? ");
+		app.put("?");
 		node.children[1].accept(this);
-		app.put(" : ");
+		app.put(":");
 		node.children[2].accept(this);
 	}
 
@@ -72,14 +72,25 @@ class Printer(Appender) : Visitor {
 		app.put(")");
 	}
 
+	override void visit(WithStatement node) {
+		app.put("with(");
+		foreach (i, child; node.children[0..$-1]) {
+			child.accept(this);
+			if ((i + 2) != node.children.length)
+				app.put(",");
+		}
+		app.put(")");
+		node.children[$-1].accept(this);
+	}
+
 	override void visit(IfStatement node) {
-		app.put("if (");
+		app.put("if(");
 		node.children[0].accept(this);
-		app.put(") ");
+		app.put(")");
 		node.children[1].accept(this);
 
 		if (node.children[2] !is null) {
-			app.put(" else ");
+			app.put("else");
 			node.children[2].accept(this);
 		}
 	}
@@ -91,7 +102,7 @@ class Printer(Appender) : Visitor {
 	}
 
 	override void visit(LoopStatement node) {
-		app.put("foreach (");
+		app.put("foreach(");
 		if (!node.key.empty) {
 			app.put(node.key.value);
 			app.put(',');
@@ -104,18 +115,18 @@ class Printer(Appender) : Visitor {
 			app.put("..");
 			node.children[1].accept(this);
 		}
-		app.put(") ");
+		app.put(")");
 
 		node.children[2].accept(this);
 	}
 
 	override void visit(StatementBlock node) {
-		app.put("{ ");
+		app.put("{");
 		foreach (child; node.children) {
 			child.accept(this);
 			app.put(";");
 		}
-		app.put(" }");
+		app.put("}");
 	}
 
 	override void visit(Module node) {

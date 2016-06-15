@@ -15,19 +15,18 @@ private template isInternal(string field) {
 }
 
 
-private static void functionWrapper(T)(void* ptr, void* self, in Value[] args, ref Value ret) if (isSomeFunction!T) {
+private static void functionWrapper(T)(void* ptr, void* self, Value[] args, ref Value ret) if (isSomeFunction!T) {
 	alias ParameterTypeTuple!T Args;
 
 	static assert ((variadicFunctionStyle!T != Variadic.d && variadicFunctionStyle!T != Variadic.c), "Non-typesafe variadic functions are not supported.");
 
 	static if (variadicFunctionStyle!T == Variadic.typesafe) {
+		enum variadic = true;
 		enum requiredArgs = Args.length - 1;
 	} else {
+		enum variadic = false;
 		enum requiredArgs = Args.length;
 	}
-
-	if (args.length < requiredArgs)
-		throw new Exception(format("expected %d arguments but got %d", requiredArgs, args.length));
 
 	static if (isFunctionPointer!T) {
 		T func = cast(T)ptr;
@@ -37,10 +36,17 @@ private static void functionWrapper(T)(void* ptr, void* self, in Value[] args, r
 		func.funcptr = cast(typeof(func.funcptr))ptr;
 	}
 
-	Args argValues;
+	static if ((Args.length == 1) && isArray!(Args[0]) && is(Unqual!(ElementType!(Args[0])) == Value)) {
+		auto argValues = args;
+	} else {
+		if ((variadic && (args.length < requiredArgs)) || (!variadic && args.length != requiredArgs))
+			throw new Exception(format("expected %d arguments but got %d", requiredArgs, args.length));
 
-	foreach (i, Arg; Args)
-		argValues[i] = args[i].get!Arg;
+		Args argValues;
+
+		foreach (i, Arg; Args)
+			argValues[i] = args[i].get!Arg;
+	}
 
 	static if (is(ReturnType!T == void)) {
 		func(argValues);
@@ -433,6 +439,46 @@ struct Value {
 		}
 	}
 
+	bool has(in Value index, Value* pout) const {
+		final switch (type) with (Type) {
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("indexing not allowed for type %s", type));
+		case String:
+			auto i = index.get!ulong;
+			if (i < length) {
+				*pout = Value(storage_.s[i..i + 1]);
+				return true;
+			}
+			return false;
+		case Array:
+			auto i = index.get!ulong;
+			if (i < length) {
+				*pout = (cast(Value*)storage_.a)[i];
+				return true;
+			}
+			return false;
+		case AssocArray:
+			auto i = index;
+			if (auto pvalue = i in storage_.aa) {
+				*pout = *pvalue;
+				return true;
+			}
+			return false;
+		case Object:
+			auto i = index.get!string;
+			if (auto pvalue = i in storage_.o) {
+				*pout = *pvalue;
+				return true;
+			}
+			return false;
+		}
+	}
+
 	ref auto get(in Value index) const {
 		final switch (type) with (Type) {
 		case Undefined:
@@ -456,7 +502,7 @@ struct Value {
 			auto i = index;
 			if (auto pvalue = i in storage_.aa)
 				return *pvalue;
-			throw new Exception(format("unknown key '%s' for associative array", i));
+			throw new Exception(format("undefined key '%s' for associative array", i));
 		case Object:
 			auto i = index.get!string;
 			if (auto pvalue = i in storage_.o)
@@ -484,10 +530,156 @@ struct Value {
 		}
 	}
 
+	int opApply(int delegate(Value) dg) {
+		final switch (type) with (Type) {
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("iteration not allowed for type %s", type));
+		case String:
+			foreach (v; storage_.s) {
+				if (auto r = dg(Value(v)))
+					return r;
+			}
+			break;
+		case Array:
+			foreach (v; storage_.a) {
+				if (auto r = dg(v))
+					return r;
+			}
+			break;
+		case AssocArray:
+			foreach (v; storage_.aa) {
+				if (auto r = dg(v))
+					return r;
+			}
+			break;
+		case Object:
+			foreach (v; storage_.o) {
+				if (auto r = dg(v))
+					return r;
+			}
+			break;
+		}
+		return 0;
+	}
+
+	int opApply(int delegate(size_t, Value) dg) {
+		final switch (type) with (Type) {
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("iteration not allowed for type %s", type));
+		case String:
+			foreach (i, v; storage_.s) {
+				if (auto r = dg(i, Value(v)))
+					return r;
+			}
+			break;
+		case Array:
+			foreach (i, v; storage_.a) {
+				if (auto r = dg(i, v))
+					return r;
+			}
+			break;
+		case AssocArray:
+			foreach (i, v; storage_.aa) {
+				if (auto r = dg(i.get!size_t, v))
+					return r;
+			}
+			break;
+		case Object:
+			size_t i;
+			foreach (v; storage_.o) {
+				if (auto r = dg(i++, v))
+					return r;
+			}
+			break;
+		}
+		return 0;
+	}
+
+	int opApply(int delegate(Value, Value) dg) {
+		final switch (type) with (Type) {
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("iteration not allowed for type %s", type));
+		case String:
+			foreach (k, v; storage_.s) {
+				if (auto r = dg(Value(k), Value(v)))
+					return r;
+			}
+			break;
+		case Array:
+			foreach (k, v; storage_.a) {
+				if (auto r = dg(Value(k), v))
+					return r;
+			}
+			break;
+		case AssocArray:
+			foreach (k, v; storage_.aa) {
+				if (auto r = dg(k, v))
+					return r;
+			}
+			break;
+		case Object:
+			foreach (k, v; storage_.o) {
+				if (auto r = dg(Value(k), v))
+					return r;
+			}
+			break;
+		}
+		return 0;
+	}
+
+	int opApply(int delegate(string, Value) dg) {
+		final switch (type) with (Type) {
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("iteration not allowed for type %s", type));
+		case String:
+			throw new Exception(format("iteration with string key not allowed for type %s", type));
+		case Array:
+			throw new Exception(format("iteration with string key not allowed for type %s", type));
+		case AssocArray:
+			foreach (k, v; storage_.aa) {
+				if (auto r = dg(k.get!string, v))
+					return r;
+			}
+			break;
+		case Object:
+			foreach (k, v; storage_.o) {
+				if (auto r = dg(k, v))
+					return r;
+			}
+			break;
+		}
+		return 0;
+	}
+
+	void call(Value[] args, ref Value ret) {
+		auto func = get!Function();
+		func.wrapper(func.ptr, func.self, args, ret);
+	}
+
 	static struct Function {
 		void* self;
 		void* ptr;
-		void function(void* ptr, void* self, in Value[], ref Value) wrapper;
+		void function(void* ptr, void* self, Value[], ref Value) wrapper;
 	}
 
 	union Storage {

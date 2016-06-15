@@ -20,22 +20,19 @@ enum CompressOptions : uint {
 
 
 auto compress(string content, CompressOptions options) {
-	if ((options & CompressOptions.removeLineBreaks) == 0) {
+	if ((options & CompressOptions.removeLineBreaks) == 0)
 		content = content.replaceAll(linebreaks, "%%~LB~%%");
-	}
 
-	if (options & CompressOptions.removeMultiSpaces) {
+	if (options & CompressOptions.removeMultiSpaces)
 		content = content.replaceAll(multispaces, " ");
-	}
 
-	if (options & CompressOptions.removeHTMLComments) {
+	if (options & CompressOptions.removeHTMLComments)
 		content = content.replaceAll(htmlComments, "");
-	}
 
 	if (options & CompressOptions.removeTagSpaces) {
 		content = content.replaceAll(tagSpaces, "$1=");
 
-		string removeEndSpaces(Captures!(string) capture) {
+		static string removeEndSpaces(Captures!(string) capture) {
 			// keep space if attribute is unquoted before trailing slash
 			return ((capture[2][0] == '/') && (!matchAll(capture[1], tagSpacesEndLastQuote).empty)) ? (capture[1] ~ " " ~ capture[2]) : (capture[1] ~ capture[2]);
 		}
@@ -51,13 +48,11 @@ auto compress(string content, CompressOptions options) {
 		content = content.replaceAll!removeQuotes(tagQuotes);
 	}
 
-	if (options & CompressOptions.removeTagSurroundSpaces) {
+	if (options & CompressOptions.removeTagSurroundSpaces)
 		content = content.replaceAll(tagSurround, "$1");
-	}
 
-	if ((options & CompressOptions.removeLineBreaks) == 0) {
+	if ((options & CompressOptions.removeLineBreaks) == 0)
 		content = content.replace("%%~LB~%%", "\n");
-	}
 
 	return content;
 }
@@ -71,6 +66,6 @@ private __gshared {
 	auto tagSpacesEnd = regex(`(<\w+(?:\s+[a-z0-9-_]+(?:\s*=\s*(?:(?:[a-z0-9-_]+)|(?:"[^"]*")|(?:'[^']*')))?)*)(?:\s+?)(/?>)`, "i");
 	auto tagSpacesEndLastQuote = regex(`"=\s*[a-z0-9-_]+$"`, "i");
 	auto tagQuotes = regex(`\s*=\s*(["'])([a-z0-9-_]+?)\1(/?)(?=[^<]*?>)`, "i");
-	auto tagSurround = regex(`\s*(</?(?:html|head|body|br|p|div|center|dl|form|hr|ol|ul|table|tbody|tr|td|th|tfoot|thead)(?:>|[\s/][^>]*>))\s*`, "i");
+	auto tagSurround = regex(`\s*(</?(?:html|head|link|script|style|li|body|br|p|div|center|dl|form|hr|ol|ul|table|tbody|tr|td|th|tfoot|thead)(?:>|[\s/][^>]*>))\s*`, "i");
 	auto tagInterSpace = regex(`>\s+<`, "i");
 }

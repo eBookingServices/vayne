@@ -33,7 +33,6 @@ struct Emitter {
 
 	static struct ConstantSlot {
 		enum Type : ubyte {
-			Global = 0,
 			Boolean,
 			String,
 			Integer,
@@ -121,7 +120,7 @@ private:
 	}
 
 	auto emitIdentifier(Identifier node) {
-		return aquire(findSymbol(node.tok.value));
+		return findSymbol(node.tok.value, node.tok.loc);
 	}
 
 	auto emitUnaryOp(UnaryOp node) {
@@ -240,26 +239,55 @@ private:
 		return target;
 	}
 
+	auto emitDispatchOpForCall(DispatchOp node, Value obj) {
+		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
+		emit!(OpCode.Move)(node.tok.loc, obj, target);
+
+		auto key = constant(ConstantSlot.Type.String, node.target.value);
+		emit!(OpCode.Dispatch)(node.tok.loc, target, obj, key);
+		return target;
+	}
+
 	auto emitFunctionCall(FunctionCall node) {
 		auto result = register();
-		auto func = emitExpression(node.children[0]);
+		auto dispatched = (cast(DispatchOp)node.children[0] !is null);
 		auto args = node.children[1..$];
 
-		if (args.length) {
-			auto base = registers(args.length);
+		if (!dispatched) {
+			auto func = emitExpression(node.children[0]);
+			scope(exit) release(func);
+
+			if (args.length) {
+				auto base = registers(args.length);
+
+				foreach (i, arg; args) {
+					auto argValue = emitExpression(arg);
+					emit!(OpCode.Move)(node.tok.loc, Value(Value.Kind.Register, base.value + cast(uint)i), argValue);
+					release(argValue);
+				}
+
+				emit!(OpCode.Call)(node.tok.loc, result, func, base, Value(Value.Kind.Immediate, cast(uint)args.length));
+
+				foreach (i; 0..args.length)
+					release(Value(Value.Kind.Register, base.value + cast(uint)(args.length - i - 1)));
+			} else {
+				emit!(OpCode.Call)(node.tok.loc, result, func, Value(Value.Kind.Register, 0), Value(Value.Kind.Immediate, 0));
+			}
+		} else {
+			auto base = registers(1 + args.length);
 
 			foreach (i, arg; args) {
 				auto argValue = emitExpression(arg);
-				emit!(OpCode.Move)(node.tok.loc, Value(Value.Kind.Register, base.value + cast(uint)i), argValue);
+				emit!(OpCode.Move)(node.tok.loc, Value(Value.Kind.Register, base.value + 1 + cast(uint)i), argValue);
 				release(argValue);
 			}
 
-			emit!(OpCode.Call)(node.tok.loc, result, func, base, Value(Value.Kind.Immediate, cast(uint)args.length));
+			auto func = emitDispatchOpForCall(cast(DispatchOp)node.children[0], base);
+			scope(exit) release(func);
+			emit!(OpCode.DispatchCall)(node.tok.loc, result, func, base, Value(Value.Kind.Immediate, 1 + cast(uint)args.length));
 
-			foreach (i; 0..args.length)
-				release(Value(Value.Kind.Register, base.value + cast(uint)(args.length - i - 1)));
-		} else {
-			emit!(OpCode.Call)(node.tok.loc, result, func, Value(Value.Kind.Register, 0), Value(Value.Kind.Immediate, 0));
+			foreach_reverse (i; 0..args.length + 1)
+				release(Value(Value.Kind.Register, base.value + cast(uint)i));
 		}
 		return result;
 	}
@@ -277,6 +305,10 @@ private:
 			emitIfStatement(ifstmt);
 		} else if (auto loopstmt = cast(LoopStatement)node) {
 			emitLoopStatement(loopstmt);
+		} else if (auto call = cast(FunctionCall)node) {
+			release(emitFunctionCall(call));
+		} else if (auto withstmt = cast(WithStatement)node) {
+			emitWithStatement(withstmt);
 		} else if (auto stmtblock = cast(StatementBlock)node) {
 			emitStatementBlock(stmtblock);
 		} else {
@@ -287,6 +319,23 @@ private:
 	void emitStatementBlock(StatementBlock node) {
 		foreach (child; node.children)
 			emitStatement(child);
+	}
+
+	void emitWithStatement(WithStatement node) {
+		Value[] exprs;
+		exprs.reserve(node.children.length - 1);
+
+		foreach (i, child; node.children[0..$-1]) {
+			auto expr = emitExpression(child);
+			emit!(OpCode.PushScope)(child.tok.loc,  expr);
+			exprs ~= expr;
+		}
+
+		emitStatement(node.children[$ - 1]);
+		emit!(OpCode.PopScope)(node.tok.loc, Value(Value.Kind.Immediate, cast(uint)exprs.length));
+
+		foreach (expr; exprs)
+			release(expr);
 	}
 
 	void emitIfStatement(IfStatement node) {
@@ -487,13 +536,15 @@ private:
 		scopes_.back[name] = value;
 	}
 
-	Value findSymbol(string name) {
+	Value findSymbol(string name, SourceLoc loc) {
 		foreach_reverse (s; scopes_) {
 			if (auto pvalue = name in s)
-				return *pvalue;
+				return aquire(*pvalue);
 		}
 
-		return constant(ConstantSlot.Type.Global, name);
+		auto result = register();
+		emit!(OpCode.LookUp)(loc, result, constant(ConstantSlot.Type.String, name));
+		return result;
 	}
 
 	void popScope() {
