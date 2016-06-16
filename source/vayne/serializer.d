@@ -31,8 +31,10 @@ const(ubyte)[] serialize(CompiledCode code) {
 		if (code.instrs.length) {
 			put!ubyte(Chunks.Instructions);
 			put!uint(cast(uint)code.instrs.length);
-			foreach (instr; code.instrs)
-				put!ulong(instr.code);
+			foreach (instr; code.instrs) {
+				put!ulong(instr.code0);
+				put!ulong(instr.code1);
+			}
 		}
 
 		if (code.locs.length) {
@@ -85,8 +87,11 @@ CompiledCode unserialize(const(ubyte)[] bytes) {
 				assert(result.instrs.empty);
 				auto count = take!uint;
 				result.instrs.reserve(count);
-				foreach (i; 0..count)
-					result.instrs ~= Instr(take!ulong);
+				foreach (i; 0..count) {
+					auto code0 = take!ulong;
+					auto code1 = take!ulong;
+					result.instrs ~= Instr(code0, code1);
+				}
 				break;
 			case Constants:
 				assert(result.constants.empty);

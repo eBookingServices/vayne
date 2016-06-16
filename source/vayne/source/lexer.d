@@ -272,7 +272,7 @@ private:
 	Token eatFloat(T)(T ch, T* start, ref T* ptr, T* end) {
 		auto dot = (ch == '.');
 
-		while ((ptr != end) && ((isDigit(*ptr) || (*ptr == '\'') || (!dot && (*ptr == '.'))))) {
+		while ((ptr != end) && ((isDigit(*ptr) || (*ptr == '\'') || (!dot && (*ptr == '.') && (*(ptr + 1) != '.'))))) {
 			if (*ptr == '.')
 				dot = true;
 			++ptr;

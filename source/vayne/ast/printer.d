@@ -55,6 +55,15 @@ class Printer(Appender) : Visitor {
 		app.put("]");
 	}
 
+	override void visit(SliceOp node) {
+		node.children[0].accept(this);
+		app.put("[");
+		node.children[1].accept(this);
+		app.put("..");
+		node.children[2].accept(this);
+		app.put("]");
+	}
+
 	override void visit(DispatchOp node) {
 		node.children[0].accept(this);
 		app.put(".");

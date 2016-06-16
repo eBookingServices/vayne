@@ -208,11 +208,23 @@ private:
 		auto ifStmt = cast(IfStatement)insert_.children.back;
 		assert(ifStmt !is null);
 
+		while (ifStmt.children[2] !is null) {
+			ifStmt = cast(IfStatement)ifStmt.children[2];
+			if (ifStmt is null)
+				throw new ParserException(context.loc, "unexpected else statement");
+		}
+
 		if (content.length) {
+			assert(ifStmt.children[2] is null);
+
 			auto elseIfStmt = create!IfStatement(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc), create!StatementBlock(Token(context.loc)), null);
+			ifStmt.children[2] = elseIfStmt;
+
 			insertStack_ ~= insert_;
-			insert_ = cast(StatementBlock)ifStmt.children[1];
+			insert_ = cast(StatementBlock)elseIfStmt.children[1];
 		} else {
+			assert(ifStmt.children[2] is null);
+
 			auto elseBlock = create!StatementBlock(Token(context.loc));
 			ifStmt.children[2] = elseBlock;
 
@@ -523,10 +535,21 @@ private struct ExprParser {
 		case "[":
 			auto op = eat();
 			auto index = parseExpression();
+			Expression end;
 			if (!index)
 				throw new ExprParserException(tok_, format("expected an index expression, not %s", tok_));
+
+			if (tok_.sep("..")) {
+				eat();
+				end = parseExpression;
+				if (!end)
+					throw new ExprParserException(tok_, format("expected an expression following '..', not %s", tok_));
+			}
 			close(']');
-			return create!IndexOp(op, expr, index);
+
+			if (end is null)
+				return create!IndexOp(op, expr, index);
+			return create!SliceOp(op, expr, index, end);
 		case ".":
 			auto op = eat();
 			if (!tok_.ident())
@@ -555,17 +578,6 @@ private struct ExprParser {
 			}
 
 			close(')');
-			return create!FunctionCall(op, expr, args);
-		case "!":
-			auto op = eat();
-
-			Node[] args;
-			if (tok_.literal()) {
-				args ~= parseLiteralExpr();
-			} else {
-				throw new ExprParserException(tok_, format("expected a literal following '!', not %s", tok_));
-			}
-
 			return create!FunctionCall(op, expr, args);
 		default:
 			break;

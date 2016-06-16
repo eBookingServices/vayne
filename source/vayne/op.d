@@ -8,6 +8,7 @@ import std.meta;
 
 enum : uint { OpCodesVersion = 1 };
 
+
 enum OpCode : ulong {
 	Nop,
 	Halt,
@@ -49,6 +50,7 @@ enum OpCode : ulong {
 	Keys,
 	TestKey,
 	Key,
+	Slice,
 	Dispatch,
 	Element,
 	LookUp,
@@ -86,182 +88,198 @@ struct Operand {
 }
 
 
-Instr encode(OpCode op, Args...)(Args args) if (Args.length <= 4) {
-	static assert(op <= (OpMask >> OpShift));
-
-	enum base = op << OpShift;
-
-	final switch (op) with (OpCode) {
-	case Nop:
-	case Halt:
-		static if (args.length == 0) {
-			return Instr(base);
-		} else {
-			break;
-		}
-	case Jump:
-	case PopScope:
-		static if (args.length == 1) {
-			assert(args[0].isImmediate);
-			return Instr(base | (cast(ulong)args[0].value << Arg0Shift));
-		} else {
-			break;
-		}
-	case Increment:
-	case Decrement:
-	case Minus:
-	case Not:
-		static if (args.length == 1) {
-			assert(args[0].isRegister);
-			return Instr(base | (cast(ulong)args[0].value << Arg0Shift));
-		} else {
-			break;
-		}
-	case Output:
-	case Throw:
-	case PushScope:
-		static if (args.length == 1) {
-			assert(args[0].isRegisterOrConst);
-			return Instr(base | (cast(ulong)args[0].value << Arg0Shift) | (args[0].isConst ? Arg0ConstMask : 0));
-		} else {
-			break;
-		}
-	case JumpIfZero:
-	case JumpIfNotZero:
-		static if (args.length == 2) {
-			assert(args[0].isImmediate);
-			assert(args[1].isRegisterOrConst);
-			return Instr(base | (cast(ulong)args[0].value << Arg0Shift) | (cast(ulong)args[1].value << Arg1Shift) | (args[1].isConst ? Arg1ConstMask : 0));
-		} else {
-			break;
-		}
-	case Test:
-	case Move:
-	case Length:
-	case Keys:
-	case LookUp:
-		static if (args.length == 2) {
-			assert(args[0].isRegister);
-			assert(args[1].isRegisterOrConst);
-			return Instr(base | (cast(ulong)args[0].value << Arg0Shift) | (cast(ulong)args[1].value << Arg1Shift) | (args[1].isConst ? Arg1ConstMask : 0));
-		} else {
-			break;
-		}
-	case And:
-	case Or:
-	case Add:
-	case Subtract:
-	case Multiply:
-	case Divide:
-	case Remainder:
-	case Power:
-	case Concat:
-	case Equal:
-	case NotEqual:
-	case Less:
-	case LessOrEqual:
-	case Greater:
-	case GreaterOrEqual:
-	case TestKey:
-	case Key:
-	case Dispatch:
-	case Element:
-		static if (args.length == 3) {
-			assert(args[0].isRegister);
-			assert(args[1].isRegisterOrConst);
-			assert(args[2].isRegisterOrConst);
-			return Instr(base | (cast(ulong)args[0].value << Arg0Shift) | (cast(ulong)args[1].value << Arg1Shift) | (args[1].isConst ? Arg1ConstMask : 0) | (cast(ulong)args[2].value << Arg2Shift) | (cast(ulong)args[2].isConst ? Arg2ConstMask : 0));
-		} else {
-			break;
-		}
-	case Call:
-	case DispatchCall:
-		static if (args.length == 4) {
-			assert(args[0].isRegister);
-			assert(args[1].isRegisterOrConst);
-			assert(args[2].isRegister);
-			assert(args[3].isImmediate);
-			assert(args[3].value <= ArgExMask);
-			return Instr(base | (cast(ulong)args[0].value << Arg0Shift) | (cast(ulong)args[1].value << Arg1Shift) | (args[1].isConst ? Arg1ConstMask : 0) | (cast(ulong)args[2].value << Arg2Shift) | (cast(ulong)args[2].isConst ? Arg2ConstMask : 0) | (cast(ulong)args[3].value << ArgExShift));
-		} else {
-			break;
-		}
-	}
-
-	assert(false, "wrong number of arguments to encode for opcode " ~ op.to!string);
-}
-
+// code0: [63 arg1 const?][62 arg0 const?][60..33 arg1][33..6 arg0][6..0 op]
+// code1: [63 arg3 const?][62 arg2 const?][62..54 unused][54..27 arg3][27..0 arg2]
 
 enum {
-	OpShift 		= 0,
 	OpBitCount		= 6,
 	OpMask 			= (1UL << OpBitCount) - 1,
 
-	ArgBitCount 	= 17,
+	ArgBitCount 	= 28,
 
 	Arg0Shift		= OpBitCount,
 	Arg1Shift		= Arg0Shift + ArgBitCount,
-	Arg2Shift		= Arg1Shift + ArgBitCount,
+	Arg2Shift		= 0,
+	Arg3Shift		= Arg2Shift + ArgBitCount,
 
-	Arg0Mask 		= (1UL << ArgBitCount) - 1,
-	Arg1Mask 		= (1UL << ArgBitCount) - 1,
-	Arg2Mask 		= (1UL << ArgBitCount) - 1,
+	ArgMask 		= (1UL << ArgBitCount) - 1,
 
-	Arg0ConstMask	= 1UL << (Arg2Shift + ArgBitCount + 0),
-	Arg1ConstMask	= 1UL << (Arg2Shift + ArgBitCount + 1),
-	Arg2ConstMask	= 1UL << (Arg2Shift + ArgBitCount + 2),
-
-	ArgExBitCount	= 4,
-	ArgExShift		= Arg2Shift + ArgBitCount + 3,
-	ArgExMask		= (1UL << ArgExBitCount) - 1,
-
-	FlagsBitCount	= 4,
-	FlagsShift		= Arg2Shift + ArgBitCount + 3,
-	FlagsMask		= (1UL << FlagsBitCount) - 1,
+	Arg0ConstMask	= 1UL << 62,
+	Arg1ConstMask	= 1UL << 63,
+	Arg2ConstMask	= 1UL << 62,
+	Arg3ConstMask	= 1UL << 63,
 }
 
 
 struct Instr {
-	ulong code;
+	this(ulong code0, ulong code1) {
+		this.code0 = code0;
+		this.code1 = code1;
+	}
+
+	this(Args...)(OpCode op, Args args) {
+		assert(op <= OpMask);
+
+		auto argCountValid = false;
+
+		enum argCount = args.length;
+
+		final switch (op) with (OpCode) {
+		case Nop:
+		case Halt:
+			static if (argCount == 0) {
+				argCountValid = true;
+			}
+			break;
+		case Jump:
+		case PopScope:
+			static if (argCount == 1) {
+				assert(args[0].isImmediate);
+				argCountValid = true;
+			}
+			break;
+		case Increment:
+		case Decrement:
+		case Minus:
+		case Not:
+			static if (argCount == 1) {
+				assert(args[0].isRegister);
+				argCountValid = true;
+			}
+			break;
+		case Output:
+		case Throw:
+		case PushScope:
+			static if (argCount == 1) {
+				assert(args[0].isRegisterOrConst);
+				argCountValid = true;
+			}
+			break;
+		case JumpIfZero:
+		case JumpIfNotZero:
+			static if (argCount == 2) {
+				assert(args[0].isImmediate);
+				assert(args[1].isRegisterOrConst);
+				argCountValid = true;
+			}
+			break;
+		case Test:
+		case Move:
+		case Length:
+		case Keys:
+		case LookUp:
+			static if (argCount == 2) {
+				assert(args[0].isRegister);
+				assert(args[1].isRegisterOrConst);
+				argCountValid = true;
+			}
+			break;
+		case And:
+		case Or:
+		case Add:
+		case Subtract:
+		case Multiply:
+		case Divide:
+		case Remainder:
+		case Power:
+		case Concat:
+		case Equal:
+		case NotEqual:
+		case Less:
+		case LessOrEqual:
+		case Greater:
+		case GreaterOrEqual:
+		case TestKey:
+		case Key:
+		case Dispatch:
+		case Element:
+			static if (argCount == 3) {
+				assert(args[0].isRegister);
+				assert(args[1].isRegisterOrConst);
+				assert(args[2].isRegisterOrConst);
+				argCountValid = true;
+			}
+			break;
+		case Slice:
+			static if (argCount == 4) {
+				assert(args[0].isRegister);
+				assert(args[1].isRegisterOrConst);
+				assert(args[2].isRegisterOrConst);
+				assert(args[3].isRegisterOrConst);
+				argCountValid = true;
+			}
+			break;
+		case Call:
+		case DispatchCall:
+			static if (argCount == 4) {
+				assert(args[0].isRegister);
+				assert(args[1].isRegisterOrConst);
+				assert(args[2].isRegister);
+				assert(args[3].isImmediate);
+				argCountValid = true;
+			}
+		}
+
+		if (!argCountValid)
+			assert(false, "wrong number of arguments to encode for opcode " ~ op.to!string);
+
+		code0 = op;
+
+		static if (argCount > 0) {
+			assert(args[0].value <= ArgMask);
+			code0 |= (cast(ulong)args[0].value << Arg0Shift) | (args[0].isConst ? Arg0ConstMask : 0);
+		}
+		static if (argCount > 1) {
+			assert(args[1].value <= ArgMask);
+			code0 |= (cast(ulong)args[1].value << Arg1Shift) | (args[1].isConst ? Arg1ConstMask : 0);
+		}
+		static if (argCount > 2) {
+			assert(args[2].value <= ArgMask);
+			code1 |= (cast(ulong)args[2].value << Arg2Shift) | (args[2].isConst ? Arg2ConstMask : 0);
+		}
+		static if (argCount > 3) {
+			assert(args[3].value <= ArgMask);
+			code1 |= (cast(ulong)args[3].value << Arg3Shift) | (args[3].isConst ? Arg3ConstMask : 0);
+		}
+	}
+
+	ulong code0;
+	ulong code1;
 
 	@property OpCode op() const {
-		return cast(OpCode)((code >> OpShift) & OpMask);
+		return cast(OpCode)(code0 & OpMask);
 	}
 
 	auto arg(size_t Arg)() const {
 		static if (Arg == 0) {
-			return (code >> Arg0Shift) & Arg0Mask;
+			return (code0 >> Arg0Shift) & ArgMask;
 		} else static if (Arg == 1) {
-			return (code >> Arg1Shift) & Arg1Mask;
+			return (code0 >> Arg1Shift) & ArgMask;
 		} else static if (Arg == 2) {
-			return (code >> Arg2Shift) & Arg2Mask;
+			return (code1 >> Arg2Shift) & ArgMask;
 		} else static if (Arg == 3) {
-			return (code >> ArgExShift) & ArgExMask;
+			return (code1 >> Arg3Shift) & ArgMask;
 		}
 	}
 
 	auto argConst(size_t Arg)() const {
 		static if (Arg == 0) {
-			return (code & Arg0ConstMask) != 0;
+			return (code0 & Arg0ConstMask) != 0;
 		} else static if (Arg == 1) {
-			return (code & Arg1ConstMask) != 0;
+			return (code0 & Arg1ConstMask) != 0;
 		} else static if (Arg == 2) {
-			return (code & Arg2ConstMask) != 0;
+			return (code1 & Arg2ConstMask) != 0;
 		} else static if (Arg == 3) {
-			return false;
+			return (code1 & Arg3ConstMask) != 0;
 		}
 	}
 
 	auto argName(size_t Arg)() const {
-		static if (Arg < 3) {
-			return format("%s%s", (argConst!Arg ? "c" : "r"), arg!Arg);
-		} else static if (Arg == 3) {
-			return format("%s", arg!Arg);
-		}
+		return format("%s%s", (argConst!Arg ? "c" : "r"), arg!Arg);
 	}
 
 	string toStringFull() const {
-		return format("%016x %s", code, toString);
+		return format("%016x%016x %s", code1, code0, toString);
 	}
 
 	bool isBoolean() const {
@@ -289,6 +307,7 @@ struct Instr {
 		case Power:
 		case Concat:
 		case Key:
+		case Slice:
 		case Dispatch:
 		case Element:
 		case LookUp:
@@ -357,6 +376,8 @@ struct Instr {
 		case Dispatch:
 		case Element:
 			return format("%s %s %s %s", name, argName!0, argName!1, argName!2);
+		case Slice:
+			return format("%s %s %s %s %s", name, argName!0, argName!1, argName!2, argName!3);
 		case DispatchCall:
 		case Call:
 			return format("%s %s %s %s %s", name, argName!0, argName!1, argName!2, arg!3);

@@ -22,6 +22,7 @@ interface IVisitor {
 	mixin NodeInterface!BinaryOp;
 	mixin NodeInterface!ConditionalExpression;
 	mixin NodeInterface!IndexOp;
+	mixin NodeInterface!SliceOp;
 	mixin NodeInterface!DispatchOp;
 	mixin NodeInterface!FunctionCall;
 	mixin NodeInterface!WithStatement;
@@ -51,6 +52,7 @@ class Visitor : IVisitor {
 	mixin VisitNode!BinaryOp;
 	mixin VisitNode!ConditionalExpression;
 	mixin VisitNode!IndexOp;
+	mixin VisitNode!SliceOp;
 	mixin VisitNode!DispatchOp;
 	mixin VisitNode!FunctionCall;
 	mixin VisitNode!WithStatement;

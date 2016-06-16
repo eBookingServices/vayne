@@ -76,6 +76,8 @@ private:
 			return emitConditionalExpression(condexpr);
 		} else if (auto indexop = cast(IndexOp)node) {
 			return emitIndexOp(indexop);
+		} else if (auto sliceop = cast(SliceOp)node) {
+			return emitSliceOp(sliceop);
 		} else if (auto dispatchop = cast(DispatchOp)node) {
 			return emitDispatchOp(dispatchop);
 		} else if (auto call = cast(FunctionCall)node) {
@@ -128,11 +130,11 @@ private:
 		switch (node.tok.name) {
 		case "-":
 			auto target = registerize(node.tok.loc, expr);
-			emit!(OpCode.Minus)(node.tok.loc, target);
+			emit(OpCode.Minus, node.tok.loc, target);
 			return target;
 		case "!":
 			auto target = registerize(node.tok.loc, expr);
-			emit!(OpCode.Not)(node.tok.loc, target);
+			emit(OpCode.Not, node.tok.loc, target);
 			return target;
 		case "+":
 			return expr;
@@ -150,52 +152,52 @@ private:
 
 		switch (node.tok.name) {
 		case "&&":
-			emit!(OpCode.And)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.And, node.tok.loc, target, lhs, rhs);
 			break;
 		case "||":
-			emit!(OpCode.Or)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Or, node.tok.loc, target, lhs, rhs);
 			break;
 		case "==":
-			emit!(OpCode.Equal)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Equal, node.tok.loc, target, lhs, rhs);
 			break;
 		case "!=":
-			emit!(OpCode.NotEqual)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.NotEqual, node.tok.loc, target, lhs, rhs);
 			break;
 		case ">":
-			emit!(OpCode.Greater)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Greater, node.tok.loc, target, lhs, rhs);
 			break;
 		case ">=":
-			emit!(OpCode.GreaterOrEqual)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.GreaterOrEqual, node.tok.loc, target, lhs, rhs);
 			break;
 		case "<":
-			emit!(OpCode.Less)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Less, node.tok.loc, target, lhs, rhs);
 			break;
 		case "<=":
-			emit!(OpCode.LessOrEqual)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.LessOrEqual, node.tok.loc, target, lhs, rhs);
 			break;
 		case "+":
-			emit!(OpCode.Add)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Add, node.tok.loc, target, lhs, rhs);
 			break;
 		case "-":
-			emit!(OpCode.Subtract)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Subtract, node.tok.loc, target, lhs, rhs);
 			break;
 		case "*":
-			emit!(OpCode.Multiply)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Multiply, node.tok.loc, target, lhs, rhs);
 			break;
 		case "/":
-			emit!(OpCode.Divide)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Divide, node.tok.loc, target, lhs, rhs);
 			break;
 		case "%":
-			emit!(OpCode.Remainder)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Remainder, node.tok.loc, target, lhs, rhs);
 			break;
 		case "~":
-			emit!(OpCode.Concat)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Concat, node.tok.loc, target, lhs, rhs);
 			break;
 		case "^^":
-			emit!(OpCode.Power)(node.tok.loc, target, lhs, rhs);
+			emit(OpCode.Power, node.tok.loc, target, lhs, rhs);
 			break;
 		case "in":
-			emit!(OpCode.TestKey)(node.tok.loc, target, rhs, lhs);
+			emit(OpCode.TestKey, node.tok.loc, target, rhs, lhs);
 			break;
 		default:
 			assert(false, "unimplemented binary op " ~ node.tok.toString);
@@ -207,27 +209,38 @@ private:
 	auto emitConditionalExpression(ConditionalExpression node) {
 		auto cond = registerize(node.tok.loc, emitExpression(node.children[0]));
 
-		emit!(OpCode.Test)(node.tok.loc, cond, cond);
+		emit(OpCode.Test, node.tok.loc, cond, cond);
 		auto jz = placeholder(node.tok.loc);
 
-		emit!(OpCode.Move)(node.tok.loc, cond, emitExpression(node.children[1]));
+		emit(OpCode.Move, node.tok.loc, cond, emitExpression(node.children[1]));
 
 		auto jmp = placeholder(node.tok.loc);
 		auto ipfalse = ip;
 
-		emit!(OpCode.Move)(node.tok.loc, cond, emitExpression(node.children[2]));
+		emit(OpCode.Move, node.tok.loc, cond, emitExpression(node.children[2]));
 
-		emitAt!(OpCode.JumpIfZero)(node.tok.loc, jz, Value(Value.Kind.Immediate, ipfalse), cond);
-		emitAt!(OpCode.Jump)(node.tok.loc, jmp, Value(Value.Kind.Immediate, ip));
+		emitAt(OpCode.JumpIfZero, node.tok.loc, jz, Value(Value.Kind.Immediate, ipfalse), cond);
+		emitAt(OpCode.Jump, node.tok.loc, jmp, Value(Value.Kind.Immediate, ip));
 
 		return cond;
 	}
 
 	auto emitIndexOp(IndexOp node) {
 		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
-		auto key = emitExpression(node.children[1]);
+		auto index = emitExpression(node.children[1]);
+		scope(exit) release(index);
 
-		emit!(OpCode.Element)(node.tok.loc, target, target, key);
+		emit(OpCode.Element, node.tok.loc, target, target, index);
+		return target;
+	}
+
+	auto emitSliceOp(SliceOp node) {
+		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
+		auto start = emitExpression(node.children[1]);
+		auto end = emitExpression(node.children[2]);
+		scope (exit) release(start, end);
+
+		emit(OpCode.Slice, node.tok.loc, target, target, start, end);
 		return target;
 	}
 
@@ -235,16 +248,16 @@ private:
 		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
 		auto key = constant(ConstantSlot.Type.String, node.target.value);
 
-		emit!(OpCode.Element)(node.tok.loc, target, target, key);
+		emit(OpCode.Element, node.tok.loc, target, target, key);
 		return target;
 	}
 
 	auto emitDispatchOpForCall(DispatchOp node, Value obj) {
 		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
-		emit!(OpCode.Move)(node.tok.loc, obj, target);
+		emit(OpCode.Move, node.tok.loc, obj, target);
 
 		auto key = constant(ConstantSlot.Type.String, node.target.value);
-		emit!(OpCode.Dispatch)(node.tok.loc, target, obj, key);
+		emit(OpCode.Dispatch, node.tok.loc, target, obj, key);
 		return target;
 	}
 
@@ -262,29 +275,29 @@ private:
 
 				foreach (i, arg; args) {
 					auto argValue = emitExpression(arg);
-					emit!(OpCode.Move)(node.tok.loc, Value(Value.Kind.Register, base.value + cast(uint)i), argValue);
+					emit(OpCode.Move, node.tok.loc, Value(Value.Kind.Register, base.value + cast(uint)i), argValue);
 					release(argValue);
 				}
 
-				emit!(OpCode.Call)(node.tok.loc, result, func, base, Value(Value.Kind.Immediate, cast(uint)args.length));
+				emit(OpCode.Call, node.tok.loc, result, func, base, Value(Value.Kind.Immediate, cast(uint)args.length));
 
 				foreach (i; 0..args.length)
 					release(Value(Value.Kind.Register, base.value + cast(uint)(args.length - i - 1)));
 			} else {
-				emit!(OpCode.Call)(node.tok.loc, result, func, Value(Value.Kind.Register, 0), Value(Value.Kind.Immediate, 0));
+				emit(OpCode.Call, node.tok.loc, result, func, Value(Value.Kind.Register, 0), Value(Value.Kind.Immediate, 0));
 			}
 		} else {
 			auto base = registers(1 + args.length);
 
 			foreach (i, arg; args) {
 				auto argValue = emitExpression(arg);
-				emit!(OpCode.Move)(node.tok.loc, Value(Value.Kind.Register, base.value + 1 + cast(uint)i), argValue);
+				emit(OpCode.Move, node.tok.loc, Value(Value.Kind.Register, base.value + 1 + cast(uint)i), argValue);
 				release(argValue);
 			}
 
 			auto func = emitDispatchOpForCall(cast(DispatchOp)node.children[0], base);
 			scope(exit) release(func);
-			emit!(OpCode.DispatchCall)(node.tok.loc, result, func, base, Value(Value.Kind.Immediate, 1 + cast(uint)args.length));
+			emit(OpCode.DispatchCall, node.tok.loc, result, func, base, Value(Value.Kind.Immediate, 1 + cast(uint)args.length));
 
 			foreach_reverse (i; 0..args.length + 1)
 				release(Value(Value.Kind.Register, base.value + cast(uint)i));
@@ -294,7 +307,7 @@ private:
 
 	void emitOutput(Output node) {
 		auto expr = emitExpression(node.children[0]);
-		emit!(OpCode.Output)(node.tok.loc, expr);
+		emit(OpCode.Output, node.tok.loc, expr);
 		release(expr);
 	}
 
@@ -327,12 +340,12 @@ private:
 
 		foreach (i, child; node.children[0..$-1]) {
 			auto expr = emitExpression(child);
-			emit!(OpCode.PushScope)(child.tok.loc,  expr);
+			emit(OpCode.PushScope, child.tok.loc,  expr);
 			exprs ~= expr;
 		}
 
 		emitStatement(node.children[$ - 1]);
-		emit!(OpCode.PopScope)(node.tok.loc, Value(Value.Kind.Immediate, cast(uint)exprs.length));
+		emit(OpCode.PopScope, node.tok.loc, Value(Value.Kind.Immediate, cast(uint)exprs.length));
 
 		foreach (expr; exprs)
 			release(expr);
@@ -344,7 +357,7 @@ private:
 		auto cond = test ? register() : expr;
 
 		if (test) {
-			emit!(OpCode.Test)(node.tok.loc, cond, expr);
+			emit(OpCode.Test, node.tok.loc, cond, expr);
 			release(expr);
 		}
 
@@ -357,10 +370,10 @@ private:
 		if (node.children[2] !is null)
 			jumpFalseCase = placeholder(node.tok.loc);
 
-		emitAt!(OpCode.JumpIfZero)(node.tok.loc, jumpTrueCase, Value(Value.Kind.Immediate, ip), cond);
+		emitAt(OpCode.JumpIfZero, node.tok.loc, jumpTrueCase, Value(Value.Kind.Immediate, ip), cond);
 		if (node.children[2] !is null) {
 			emitStatement(node.children[2]);
-			emitAt!(OpCode.Jump)(node.tok.loc, jumpFalseCase, Value(Value.Kind.Immediate, ip));
+			emitAt(OpCode.Jump, node.tok.loc, jumpFalseCase, Value(Value.Kind.Immediate, ip));
 		}
 	}
 
@@ -383,21 +396,21 @@ private:
 
 			auto test = ip;
 			auto cond = register();
-			emit!(OpCode.Less)(node.tok.loc, cond, it, end);
+			emit(OpCode.Less, node.tok.loc, cond, it, end);
 			size_t jumpBody = placeholder(node.tok.loc);
 			release(cond);
 
 			emitStatementBlock(body_);
-			emit!(OpCode.Increment)(node.tok.loc, it);
-			emit!(OpCode.Jump)(node.tok.loc, Value(Value.Kind.Immediate, test));
-			emitAt!(OpCode.JumpIfZero)(node.tok.loc, jumpBody, Value(Value.Kind.Immediate, ip), cond);
+			emit(OpCode.Increment, node.tok.loc, it);
+			emit(OpCode.Jump, node.tok.loc, Value(Value.Kind.Immediate, test));
+			emitAt(OpCode.JumpIfZero, node.tok.loc, jumpBody, Value(Value.Kind.Immediate, ip), cond);
 			release(it, end);
 		} else {
 			// array / object
 			auto obj = emitExpression(node.children[0]);
 			auto len = register();
 
-			emit!(OpCode.Length)(node.tok.loc, len, obj);
+			emit(OpCode.Length, node.tok.loc, len, obj);
 
 			auto it = registerize(node.tok.loc, constant(ConstantSlot.Type.Integer, "0"));
 			auto key = register();
@@ -410,17 +423,17 @@ private:
 
 			auto test = ip;
 			auto cond = register();
-			emit!(OpCode.Less)(node.tok.loc, cond, it, len);
+			emit(OpCode.Less, node.tok.loc, cond, it, len);
 			size_t jumpBody = placeholder(node.tok.loc);
 			release(cond);
 
-			emit!(OpCode.Key)(node.tok.loc, key, obj, it);
-			emit!(OpCode.Element)(node.tok.loc, value, obj, key);
+			emit(OpCode.Key, node.tok.loc, key, obj, it);
+			emit(OpCode.Element, node.tok.loc, value, obj, key);
 
 			emitStatementBlock(body_);
-			emit!(OpCode.Increment)(node.tok.loc, it);
-			emit!(OpCode.Jump)(node.tok.loc, Value(Value.Kind.Immediate, test));
-			emitAt!(OpCode.JumpIfZero)(node.tok.loc, jumpBody, Value(Value.Kind.Immediate, ip), cond);
+			emit(OpCode.Increment, node.tok.loc, it);
+			emit(OpCode.Jump, node.tok.loc, Value(Value.Kind.Immediate, test));
+			emitAt(OpCode.JumpIfZero, node.tok.loc, jumpBody, Value(Value.Kind.Immediate, ip), cond);
 			release(it, len, obj, key, value);
 		}
 
@@ -495,14 +508,14 @@ private:
 			assert(value.kind == Value.Kind.Constant);
 
 			auto target = register();
-			emit!(OpCode.Move)(loc, target, value);
+			emit(OpCode.Move, loc, target, value);
 			return target;
 		}
 		return value;
 	}
 
 	auto placeholder(SourceLoc loc) {
-		instrs_ ~= encode!(OpCode.Nop)();
+		instrs_ ~= Instr(OpCode.Nop);
 		locs_ ~= loc;
 		return cast(uint)instrs_.length - 1;
 	}
@@ -511,14 +524,14 @@ private:
 		return cast(uint)instrs_.length;
 	}
 
-	auto emit(OpCode op, Args...)(SourceLoc loc, Args args) {
-		instrs_ ~= encode!op(args);
+	auto emit(Args...)(OpCode op, SourceLoc loc, Args args) {
+		instrs_ ~= Instr(op, args);
 		locs_ ~= loc;
 		return instrs_.length - 1;
 	}
 
-	auto emitAt(OpCode op, Args...)(SourceLoc loc, size_t at, Args args) {
-		instrs_[at] = encode!op(args);
+	auto emitAt(Args...)(OpCode op, SourceLoc loc, size_t at, Args args) {
+		instrs_[at] = Instr(op, args);
 		locs_[at] = loc;
 	}
 
@@ -543,7 +556,7 @@ private:
 		}
 
 		auto result = register();
-		emit!(OpCode.LookUp)(loc, result, constant(ConstantSlot.Type.String, name));
+		emit(OpCode.LookUp, loc, result, constant(ConstantSlot.Type.String, name));
 		return result;
 	}
 

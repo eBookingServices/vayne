@@ -101,7 +101,7 @@ struct VM(uint options = VMOptions.Default) {
 		Instr instr = instrs_[0];
 		ulong ip;
 
-		ref auto getArgV(size_t Arg)() if (Arg <= 2) {
+		ref auto getArgV(size_t Arg)() if (Arg <= 3) {
 			if (instr.argConst!Arg) {
 				return consts_[instr.arg!Arg];
 			} else {
@@ -239,6 +239,9 @@ struct VM(uint options = VMOptions.Default) {
 					break;
 				case Key:
 					regs_[instr.arg!0] = getArgV!1.key(getArgV!2);
+					break;
+				case Slice:
+					regs_[instr.arg!0] = getArgV!1.slice(getArgV!2, getArgV!3);
 					break;
 				case Dispatch:
 					assert(!dispatchArg_);

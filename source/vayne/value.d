@@ -511,6 +511,24 @@ struct Value {
 		}
 	}
 
+	ref auto slice(in Value start, in Value end) const {
+		final switch (type) with (Type) {
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+		case AssocArray:
+		case Object:
+			throw new Exception(format("slicing not allowed for type %s", type));
+		case String:
+			return Value(storage_.s[start.get!long..end.get!long]);
+		case Array:
+			return Value(storage_.a[start.get!long..end.get!long]);
+		}
+	}
+
 	ref auto key(in Value index) const {
 		final switch (type) with (Type) {
 		case Undefined:

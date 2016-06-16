@@ -105,6 +105,15 @@ class IndexOp : Node {
 }
 
 
+class SliceOp : Node {
+	this(Token tok, Node expr, Node start, Node end) {
+		super(tok, expr, start, end);
+	}
+
+	mixin VisitorInterface;
+}
+
+
 class DispatchOp : Node {
 	this(Token tok, Node expr, Token target) {
 		super(tok, expr);
