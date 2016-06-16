@@ -26,6 +26,7 @@ struct Token {
 		In,
 		Def,
 		Undef,
+		As,
 	}
 
 	enum LiteralKind : ubyte {

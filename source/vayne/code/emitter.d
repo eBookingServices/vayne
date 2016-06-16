@@ -116,6 +116,7 @@ private:
 			case In:
 			case Def:
 			case Undef:
+			case As:
 				assert(false, "unimplemented keyword kind constant " ~ node.tok.kindKeyword);
 			}
 		}
@@ -338,17 +339,32 @@ private:
 		Value[] exprs;
 		exprs.reserve(node.children.length - 1);
 
-		foreach (i, child; node.children[0..$-1]) {
-			auto expr = emitExpression(child);
-			emit(OpCode.PushScope, child.tok.loc,  expr);
+		pushScope();
+
+		uint scopes;
+		foreach (i, childNode; node.children[0..$-1]) {
+			auto child = cast(WithExpression)childNode;
+			assert(child !is null);
+
+			auto expr = emitExpression(child.children[0]);
+
+			if (child.name.empty) {
+				++scopes;
+				emit(OpCode.PushScope, child.tok.loc,  expr);
+			} else {
+				addSymbol(child.name.value, aquire(expr));
+			}
+
 			exprs ~= expr;
 		}
 
 		emitStatement(node.children[$ - 1]);
-		emit(OpCode.PopScope, node.tok.loc, Value(Value.Kind.Immediate, cast(uint)exprs.length));
+		emit(OpCode.PopScope, node.tok.loc, Value(Value.Kind.Immediate, scopes));
 
 		foreach (expr; exprs)
 			release(expr);
+
+		popScope();
 	}
 
 	void emitIfStatement(IfStatement node) {

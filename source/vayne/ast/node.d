@@ -163,6 +163,19 @@ class WithStatement : Node {
 }
 
 
+class WithExpression : Node {
+	this(Token tok, Node expr, Token name) {
+		super(tok, expr);
+
+		this.name = name;
+	}
+
+	mixin VisitorInterface;
+
+	Token name;
+}
+
+
 class IfStatement : Node {
 	this(Token tok, Node expr, Node trueCase, Node elseCase) {
 		super(tok, expr, trueCase, elseCase);

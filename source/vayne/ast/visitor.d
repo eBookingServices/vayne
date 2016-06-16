@@ -25,6 +25,7 @@ interface IVisitor {
 	mixin NodeInterface!SliceOp;
 	mixin NodeInterface!DispatchOp;
 	mixin NodeInterface!FunctionCall;
+	mixin NodeInterface!WithExpression;
 	mixin NodeInterface!WithStatement;
 	mixin NodeInterface!IfStatement;
 	mixin NodeInterface!LoopStatement;
@@ -55,6 +56,7 @@ class Visitor : IVisitor {
 	mixin VisitNode!SliceOp;
 	mixin VisitNode!DispatchOp;
 	mixin VisitNode!FunctionCall;
+	mixin VisitNode!WithExpression;
 	mixin VisitNode!WithStatement;
 	mixin VisitNode!IfStatement;
 	mixin VisitNode!LoopStatement;

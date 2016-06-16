@@ -113,6 +113,10 @@ private:
 							current_ = Token(name, Token.KeywordKind.In, 0, loc_);
 							return;
 						}
+						if (name == "as") {
+							current_ = Token(name, Token.KeywordKind.As, 0, loc_);
+							return;
+						}
 						break;
 					case 3:
 						if (name == "def") {

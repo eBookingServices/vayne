@@ -67,7 +67,7 @@ class Printer(Appender) : Visitor {
 	override void visit(DispatchOp node) {
 		node.children[0].accept(this);
 		app.put(".");
-		app.put(node.target.toString);
+		app.put(node.target.value);
 	}
 
 	override void visit(FunctionCall node) {
@@ -79,6 +79,14 @@ class Printer(Appender) : Visitor {
 				app.put(",");
 		}
 		app.put(")");
+	}
+
+	override void visit(WithExpression node) {
+		node.children[0].accept(this);
+		if (!node.name.empty) {
+			app.put(" as ");
+			app.put(node.name.value);
+		}
 	}
 
 	override void visit(WithStatement node) {

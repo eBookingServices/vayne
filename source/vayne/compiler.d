@@ -23,6 +23,7 @@ struct CompilerOptions {
 	auto preparsePrint = false;
 	auto astPrint = false;
 	auto instrPrint = false;
+	auto byteCodePrint = false;
 	auto constPrint = false;
 	auto lineNumbers = false;
 	auto compress = false;
@@ -84,16 +85,21 @@ CompiledCode compile(string fileName, CompilerOptions options) {
 
 	if (options.constPrint) {
 		foreach (i, k; emitter.constants)
-			writeln(format("%4d %8s %s", i, k.type, k.value));
+			writeln(format("%4d %16s %s", i, k.type, k.value));
 	}
 
-	if (options.instrPrint) {
+	if (options.instrPrint || options.byteCodePrint) {
+		auto fmt = "%5d " ~ (options.byteCodePrint ? "%-54s" : "%-20s");
+
+		if (options.lineNumbers)
+			fmt ~= " ; %s";
+
 		if (options.lineNumbers) {
 			foreach (ip, instr; emitter.instrs)
-				writeln(format("%4d %s ; %s", ip, instr, mgr.loc(emitter.locs[ip])));
+				writeln(format(fmt, ip, options.byteCodePrint ? instr.toStringFull : instr.toString, mgr.loc(emitter.locs[ip])));
 		} else {
 			foreach (ip, instr; emitter.instrs)
-				writeln(format("%4d %s", ip, instr));
+				writeln(format(fmt, ip, options.byteCodePrint ? instr.toStringFull : instr.toString));
 		}
 	}
 

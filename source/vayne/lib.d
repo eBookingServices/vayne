@@ -20,6 +20,12 @@ void bindLibDefault(Value[string] globals) {
 		return x.keys();
 	}
 
+	static Value def(Value x, Value def) {
+		if (x.type == Value.Type.Undefined)
+			return def;
+		return x;
+	}
+
 	static string join(Value x, Value sep) {
 		auto app = appender!string;
 		auto len = x.length;
@@ -68,6 +74,8 @@ void bindLibDefault(Value[string] globals) {
 	globals["float"] = Value(&tofloat);
 	globals["string"] = Value(&tostring);
 	globals["bool"] = Value(&tobool);
+
+	globals["default"] = Value(&def);
 
 	globals["join"] = Value(&join);
 	globals["split"] = Value(&split);

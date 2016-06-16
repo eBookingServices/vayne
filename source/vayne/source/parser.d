@@ -260,9 +260,9 @@ private:
 		context.open(content[0..1], content[1..$]);
 		content = content[1..$].strip;
 
-		auto args = parseExprList(Source(source_.id, source_.parent, content), context.loc);
+		auto withStmt = parseWith(Source(source_.id, source_.parent, content), context.loc);
 		auto bodyBlock = create!StatementBlock(Token(context.loc));
-		auto withStmt = create!WithStatement(Token(context.loc), cast(Node[])args, bodyBlock);
+		withStmt.children[$-1] = bodyBlock;
 		insert_.children ~= withStmt;
 
 		insertStack_ ~= insert_;
@@ -349,6 +349,13 @@ auto parseLoop(Source source, SourceLoc loc) {
 }
 
 
+auto parseWith(Source source, SourceLoc loc) {
+	auto parser = ExprParser(source, loc);
+	parser.warmUp();
+	return parser.parseWithStatement(loc);
+}
+
+
 private struct ExprParser {
 	this(Source source, SourceLoc loc) {
 		lexer_ = Lexer(source, loc);
@@ -383,6 +390,37 @@ private struct ExprParser {
 				throw new ExprParserException(tok_, format("expected an expression following ',', not %s", tok_));
 			}
 			return exprs;
+		}
+		return null;
+	}
+
+	WithStatement parseWithStatement(SourceLoc loc) {
+		if (auto expr = parseWithExpression) {
+			WithExpression[] exprs;
+			exprs ~= expr;
+
+			while (tok_.sep(',')) {
+				eat();
+				if (auto next = parseWithExpression()) {
+					exprs ~= next;
+					continue;
+				}
+				throw new ExprParserException(tok_, format("expected a with expression following ',', not %s", tok_));
+			}
+			return create!WithStatement(Token(loc), cast(Node[])exprs, null);
+		}
+		return null;
+	}
+
+	WithExpression parseWithExpression() {
+		if (auto expr = parseExpression()) {
+			if (tok_.keyword(Token.KeywordKind.As)) {
+				eat();
+				if (!tok_.ident())
+					throw new ExprParserException(tok_, format("expected an identifier following 'as', not %s", tok_));
+				auto name = eat();
+				return create!WithExpression(expr.tok, expr, name);
+			}
 		}
 		return null;
 	}
