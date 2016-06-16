@@ -21,7 +21,8 @@ class ContextException : Exception {
 class Context {
 	this(Source source) {
 		this.source = source;
-		this.loc = SourceLoc(source.id, 1);
+
+		loc = SourceLoc(source.id, 1);
 	}
 
 	this(Source source, SourceLoc loc) {

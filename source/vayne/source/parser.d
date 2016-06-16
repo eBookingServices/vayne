@@ -330,28 +330,28 @@ class ExprParserException : Exception {
 
 auto parseExpr(Source source, SourceLoc loc) {
 	auto parser = ExprParser(source, loc);
-	parser.warmUp();
+	scope (success) parser.ensureEndOfInput();
 	return parser.parseExpression();
 }
 
 
 auto parseExprList(Source source, SourceLoc loc) {
 	auto parser = ExprParser(source, loc);
-	parser.warmUp();
+	scope (success) parser.ensureEndOfInput();
 	return parser.parseExpressionList();
 }
 
 
 auto parseLoop(Source source, SourceLoc loc) {
 	auto parser = ExprParser(source, loc);
-	parser.warmUp();
+	scope (success) parser.ensureEndOfInput();
 	return parser.parseLoopStatement(loc);
 }
 
 
 auto parseWith(Source source, SourceLoc loc) {
 	auto parser = ExprParser(source, loc);
-	parser.warmUp();
+	scope (success) parser.ensureEndOfInput();
 	return parser.parseWithStatement(loc);
 }
 
@@ -359,6 +359,8 @@ auto parseWith(Source source, SourceLoc loc) {
 private struct ExprParser {
 	this(Source source, SourceLoc loc) {
 		lexer_ = Lexer(source, loc);
+
+		warmUp();
 	}
 
 	Expression parseExpression() {
@@ -387,7 +389,7 @@ private struct ExprParser {
 					exprs ~= next;
 					continue;
 				}
-				throw new ExprParserException(tok_, format("expected an expression following ',', not %s", tok_));
+				throw new ExprParserException(tok_, format("expected an expression following ',', not '%s'", tok_));
 			}
 			return exprs;
 		}
@@ -405,7 +407,7 @@ private struct ExprParser {
 					exprs ~= next;
 					continue;
 				}
-				throw new ExprParserException(tok_, format("expected a with expression following ',', not %s", tok_));
+				throw new ExprParserException(tok_, format("expected a with expression following ',', not '%s'", tok_));
 			}
 			return create!WithStatement(Token(loc), cast(Node[])exprs, null);
 		}
@@ -417,7 +419,7 @@ private struct ExprParser {
 			if (tok_.keyword(Token.KeywordKind.As)) {
 				eat();
 				if (!tok_.ident())
-					throw new ExprParserException(tok_, format("expected an identifier following 'as', not %s", tok_));
+					throw new ExprParserException(tok_, format("expected an identifier following 'as', not '%s'", tok_));
 				auto name = eat();
 				return create!WithExpression(expr.tok, expr, name);
 			}
@@ -427,23 +429,23 @@ private struct ExprParser {
 
 	LoopStatement parseLoopStatement(SourceLoc loc) {
 		if (!tok_.ident)
-			throw new ExprParserException(tok_, format("expected an identifier, not %s", tok_));
+			throw new ExprParserException(tok_, format("expected an identifier, not '%s'", tok_));
 
 		Token key = eat();
 		Token name;
 		if (tok_.sep(',')) {
 			eat();
 			if (!tok_.ident)
-				throw new ExprParserException(tok_, format("expected an identifier, not %s", tok_));
+				throw new ExprParserException(tok_, format("expected an identifier, not '%s'", tok_));
 			name = eat();
 			if (!tok_.sep(';'))
-				throw new ExprParserException(tok_, format("expected ';', not %s", tok_));
+				throw new ExprParserException(tok_, format("expected ';', not '%s'", tok_));
 			eat();
 		} else if (tok_.sep(';')) {
 			eat();
 			swap(key, name);
 		} else {
-			throw new ExprParserException(tok_, format("expected ';' or ',' followed by an identifier, not %s", tok_));
+			throw new ExprParserException(tok_, format("expected ';' or ',' followed by an identifier, not '%s'", tok_));
 		}
 
 		Expression obj;
@@ -451,17 +453,14 @@ private struct ExprParser {
 
 		obj = parseExpression();
 		if (!obj)
-			throw new ExprParserException(tok_, format("expected an expression, not %s", tok_));
+			throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
 
 		if (tok_.name == "..") {
 			eat();
 			end = parseExpression();
 			if (!end)
-				throw new ExprParserException(tok_, format("expected an expression, not %s", tok_));
+				throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
 		}
-
-		if (!tok_.eoi)
-			throw new ExprParserException(tok_, format("unexpected %s", tok_));
 
 		return create!LoopStatement(Token(loc), key, name, obj, end, null);
 	}
@@ -494,7 +493,7 @@ private struct ExprParser {
 				auto start = eat();
 				auto expr = parseExpression();
 				if (!expr)
-					throw new ExprParserException(tok_, format("expected an expression, not %s", tok_));
+					throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
 
 				close(')');
 				return create!Expression(start, expr, true);
@@ -512,7 +511,7 @@ private struct ExprParser {
 			case False:
 				return create!Constant(eat());
 			default:
-				throw new ExprParserException(tok_, format("unexpected %s", tok_));
+				throw new ExprParserException(tok_, format("unexpected '%s'", tok_));
 			}
 		case Undefined:
 		case EndOfInput:
@@ -562,7 +561,7 @@ private struct ExprParser {
 			auto op = eat();
 			auto expr = parseExpressionPrimary();
 			if (!expr)
-				throw new ExprParserException(tok_, format("expected an expression, not %s", tok_));
+				throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
 			return create!UnaryOp(op, expr);
 		}
 		return null;
@@ -575,13 +574,13 @@ private struct ExprParser {
 			auto index = parseExpression();
 			Expression end;
 			if (!index)
-				throw new ExprParserException(tok_, format("expected an index expression, not %s", tok_));
+				throw new ExprParserException(tok_, format("expected an index expression, not '%s'", tok_));
 
 			if (tok_.sep("..")) {
 				eat();
 				end = parseExpression;
 				if (!end)
-					throw new ExprParserException(tok_, format("expected an expression following '..', not %s", tok_));
+					throw new ExprParserException(tok_, format("expected an expression following '..', not '%s'", tok_));
 			}
 			close(']');
 
@@ -591,8 +590,9 @@ private struct ExprParser {
 		case ".":
 			auto op = eat();
 			if (!tok_.ident())
-				throw new ExprParserException(tok_, format("expected an identifier following '.', not %s", tok_));
-			return create!DispatchOp(op, expr, eat());
+				throw new ExprParserException(tok_, format("expected an identifier following '.', not '%s'", tok_));
+			auto ident = eat();
+			return create!DispatchOp(op, expr, ident);
 		case "(":
 			auto op = eat();
 
@@ -609,13 +609,26 @@ private struct ExprParser {
 							continue;
 						}
 
-						throw new ExprParserException(tok_, format("expected ')' or ',' not %s", tok_));
+						throw new ExprParserException(tok_, format("expected ')' or ',' not '%s'", tok_));
 					}
 					break;
 				}
 			}
 
 			close(')');
+			return create!FunctionCall(op, expr, args);
+		case "!":
+			auto op = eat();
+
+			Node[] args;
+			if (tok_.literal()) {
+				args ~= parseLiteralExpr();
+			} else if (tok_.ident()) {
+				args ~= parseIdentifierExpr();
+			} else {
+				throw new ExprParserException(tok_, format("expected a literal or an identifier following '!', not '%s'", tok_));
+			}
+
 			return create!FunctionCall(op, expr, args);
 		default:
 			break;
@@ -699,12 +712,12 @@ private struct ExprParser {
 					eat();
 					falseCase = parseExpression();
 					if (!falseCase)
-						throw new ExprParserException(tok_, format("expected an expression, not %s", tok_));
+						throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
 				} else {
-					throw new ExprParserException(tok_, format("expected ':', not %s", tok_));
+					throw new ExprParserException(tok_, format("expected ':', not '%s'", tok_));
 				}
 			} else {
-				throw new ExprParserException(tok_, format("expected an expression, not %s", tok_));
+				throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
 			}
 
 			return create!ConditionalExpression(op, expr, trueCase, falseCase);
@@ -741,14 +754,16 @@ private struct ExprParser {
 				ahead_[$ - 1] = lexer_.front;
 				lexer_.popFront;
 			}
+
+			return behind_[0];
 		}
 
-		return behind_[0];
+		return tok_;
 	}
 
 	void open(char separator, Token by) {
 		if (!tok_.sep(separator)) {
-			throw new ExprParserException(tok_, format("expected %s following %s, not %s", separator, by, tok_));
+			throw new ExprParserException(tok_, format("expected '%s' following '%s', not '%s'", separator, by, tok_));
 		} else {
 			eat();
 		}
@@ -756,10 +771,15 @@ private struct ExprParser {
 
 	void close(char separator) {
 		if (!tok_.sep(separator)) {
-			throw new ExprParserException(tok_, format("expected %s, not %s", separator, tok_));
+			throw new ExprParserException(tok_, format("expected '%s', not '%s'", separator, tok_));
 		} else {
 			eat();
 		}
+	}
+
+	void ensureEndOfInput() {
+		if (!tok_.eoi)
+			throw new ExprParserException(tok_, format("unexpected '%s'", tok_));
 	}
 
 private:

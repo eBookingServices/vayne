@@ -7,3 +7,4 @@ __dummy.html
 *.obj
 vayne
 !vayne/
+*.vayne

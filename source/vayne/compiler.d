@@ -89,7 +89,7 @@ CompiledCode compile(string fileName, CompilerOptions options) {
 	}
 
 	if (options.instrPrint || options.byteCodePrint) {
-		auto fmt = "%5d " ~ (options.byteCodePrint ? "%-54s" : "%-20s");
+		auto fmt = "%5d " ~ (options.byteCodePrint ? "%-58s" : "%-24s");
 
 		if (options.lineNumbers)
 			fmt ~= " ; %s";

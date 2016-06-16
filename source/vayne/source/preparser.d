@@ -344,10 +344,9 @@ private:
 		return null;
 	}
 
-
 	string sourceInfo(SourceLoc loc) {
 		if (options_.lineNumbers)
-			return format("{{;src:%d:%d:%d}}", loc.id, loc.line, loc.column);
+			return format("{{;src:%d:%d:%d %s}}", loc.id, loc.line, loc.column, mgr_.name(loc.id));
 		return null;
 	}
 

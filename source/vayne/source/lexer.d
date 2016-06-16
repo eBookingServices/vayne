@@ -39,8 +39,7 @@ struct Lexer {
 	void popFront() {
 		assert(!empty);
 
-		auto result = current_;
-		if (result.kind == Token.Kind.EndOfInput) {
+		if (current_.kind == Token.Kind.EndOfInput) {
 			empty_ = true;
 		} else {
 			eat;
@@ -157,7 +156,7 @@ private:
 			}
 		}
 
-		if (source_.empty)
+		if (ptr >= end)
 			current_ = Token(Token.Kind.EndOfInput, null, loc_);
 	}
 

@@ -6,12 +6,27 @@ import std.array;
 import std.string;
 
 import vayne.ast.node;
+import vayne.ast.printer;
 import vayne.op;
 import vayne.source.source;
 import vayne.source.token;
 
 
 private alias Value = Operand;
+
+
+enum Guard = q{
+	auto __refs = reduce!((a, b) => a + b)(0, refs_);
+	scope (success) {
+		auto refs = reduce!((a, b) => a + b)(0, refs_);
+		assert((refs == __refs) || (refs == 1 + __refs), "leaking registers!");
+	}
+	auto __scopes = scopes_.length;
+	scope (success) {
+		auto scopes = scopes_.length;
+		assert(scopes == __scopes, "leaking scopes!");
+	}
+};
 
 
 struct Emitter {
@@ -55,12 +70,14 @@ struct Emitter {
 			emitStatement(child);
 
 		assert(scopes_.empty);
+		assert(!registers_ || reduce!((a, b) => a + b)(0, refs_) == 0);
 		assert(registers_ == frees_.length);
-		assert(!registers_ || refs_.reduce!((a, b) => a + b) == 0);
 	}
 
 private:
 	Value emitExpression(Node node) {
+		debug mixin(Guard);
+
 		assert(node !is null);
 		if (auto expr = cast(Expression)node) {
 			return emitExpression(expr.children[0]);
@@ -88,6 +105,8 @@ private:
 	}
 
 	auto emitConstant(Constant node) {
+		debug mixin(Guard);
+
 		assert((node.tok.kind == Token.Kind.Literal) || (node.tok.kind == Token.Kind.Keyword));
 
 		if (node.tok.kind == Token.Kind.Literal) {
@@ -123,10 +142,14 @@ private:
 	}
 
 	auto emitIdentifier(Identifier node) {
+		debug mixin(Guard);
+
 		return findSymbol(node.tok.value, node.tok.loc);
 	}
 
 	auto emitUnaryOp(UnaryOp node) {
+		debug mixin(Guard);
+
 		auto expr = emitExpression(node.children[0]);
 		switch (node.tok.name) {
 		case "-":
@@ -145,6 +168,8 @@ private:
 	}
 
 	auto emitBinaryOp(BinaryOp node) {
+		debug mixin(Guard);
+
 		auto lhs = emitExpression(node.children[0]);
 		auto rhs = emitExpression(node.children[1]);
 		scope (exit) release(lhs, rhs);
@@ -208,25 +233,36 @@ private:
 	}
 
 	auto emitConditionalExpression(ConditionalExpression node) {
-		auto cond = registerize(node.tok.loc, emitExpression(node.children[0]));
+		debug mixin(Guard);
 
-		emit(OpCode.Test, node.tok.loc, cond, cond);
+		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
+
+		emit(OpCode.Test, node.tok.loc, target, target);
 		auto jz = placeholder(node.tok.loc);
 
-		emit(OpCode.Move, node.tok.loc, cond, emitExpression(node.children[1]));
+		auto trueCase = emitExpression(node.children[1]);
+		emit(OpCode.Move, node.tok.loc, target, trueCase);
+		release(trueCase);
 
 		auto jmp = placeholder(node.tok.loc);
 		auto ipfalse = ip;
 
-		emit(OpCode.Move, node.tok.loc, cond, emitExpression(node.children[2]));
+		auto falseCase = emitExpression(node.children[2]);
+		emit(OpCode.Move, node.tok.loc, target, falseCase);
+		release(falseCase);
 
-		emitAt(OpCode.JumpIfZero, node.tok.loc, jz, Value(Value.Kind.Immediate, ipfalse), cond);
+		emitAt(OpCode.JumpIfZero, node.tok.loc, jz, Value(Value.Kind.Immediate, ipfalse), target);
 		emitAt(OpCode.Jump, node.tok.loc, jmp, Value(Value.Kind.Immediate, ip));
 
-		return cond;
+		assert(!canFind(frees_, target.value));
+		assert(refs_[target.value] > 0);
+
+		return target;
 	}
 
 	auto emitIndexOp(IndexOp node) {
+		debug mixin(Guard);
+
 		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
 		auto index = emitExpression(node.children[1]);
 		scope(exit) release(index);
@@ -236,6 +272,8 @@ private:
 	}
 
 	auto emitSliceOp(SliceOp node) {
+		debug mixin(Guard);
+
 		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
 		auto start = emitExpression(node.children[1]);
 		auto end = emitExpression(node.children[2]);
@@ -246,6 +284,8 @@ private:
 	}
 
 	auto emitDispatchOp(DispatchOp node) {
+		debug mixin(Guard);
+
 		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
 		auto key = constant(ConstantSlot.Type.String, node.target.value);
 
@@ -263,13 +303,15 @@ private:
 	}
 
 	auto emitFunctionCall(FunctionCall node) {
+		debug mixin(Guard);
+
 		auto result = register();
 		auto dispatched = (cast(DispatchOp)node.children[0] !is null);
 		auto args = node.children[1..$];
 
 		if (!dispatched) {
 			auto func = emitExpression(node.children[0]);
-			scope(exit) release(func);
+			scope (exit) release(func);
 
 			if (args.length) {
 				auto base = registers(args.length);
@@ -283,7 +325,7 @@ private:
 				emit(OpCode.Call, node.tok.loc, result, func, base, Value(Value.Kind.Immediate, cast(uint)args.length));
 
 				foreach (i; 0..args.length)
-					release(Value(Value.Kind.Register, base.value + cast(uint)(args.length - i - 1)));
+					release(Value(Value.Kind.Register, base.value + cast(uint)i));
 			} else {
 				emit(OpCode.Call, node.tok.loc, result, func, Value(Value.Kind.Register, 0), Value(Value.Kind.Immediate, 0));
 			}
@@ -300,19 +342,23 @@ private:
 			scope(exit) release(func);
 			emit(OpCode.DispatchCall, node.tok.loc, result, func, base, Value(Value.Kind.Immediate, 1 + cast(uint)args.length));
 
-			foreach_reverse (i; 0..args.length + 1)
+			foreach (i; 0..args.length + 1)
 				release(Value(Value.Kind.Register, base.value + cast(uint)i));
 		}
 		return result;
 	}
 
 	void emitOutput(Output node) {
+		debug mixin(Guard);
+
 		auto expr = emitExpression(node.children[0]);
 		emit(OpCode.Output, node.tok.loc, expr);
 		release(expr);
 	}
 
 	void emitStatement(Node node) {
+		debug mixin(Guard);
+
 		if (auto output = cast(Output)node) {
 			emitOutput(output);
 		} else if (auto ifstmt = cast(IfStatement)node) {
@@ -331,11 +377,15 @@ private:
 	}
 
 	void emitStatementBlock(StatementBlock node) {
+		debug mixin(Guard);
+
 		foreach (child; node.children)
 			emitStatement(child);
 	}
 
 	void emitWithStatement(WithStatement node) {
+		debug mixin(Guard);
+
 		Value[] exprs;
 		exprs.reserve(node.children.length - 1);
 
@@ -368,6 +418,8 @@ private:
 	}
 
 	void emitIfStatement(IfStatement node) {
+		debug mixin(Guard);
+
 		auto expr = emitExpression(node.children[0]);
 		auto test = (instrs_.empty || !instrs_.back.isBoolean);
 		auto cond = test ? register() : expr;
@@ -379,6 +431,9 @@ private:
 
 		size_t jumpTrueCase = placeholder(node.tok.loc);
 		release(cond);
+
+		assert(canFind(frees_, cond.value));
+		assert(refs_[cond.value] == 0);
 
 		emitStatement(node.children[1]);
 
@@ -394,6 +449,8 @@ private:
 	}
 
 	void emitLoopStatement(LoopStatement node) {
+		debug mixin(Guard);
+
 		auto body_ = cast(StatementBlock)node.children[2];
 		assert(body_ !is null);
 
@@ -473,21 +530,44 @@ private:
 	auto registers(size_t count) {
 		if (count == 1) {
 			return register();
-		} else {
+		} else if (count > 1) {
+			auto index = registers_;
+
 			if (frees_.length >= count) {
-				// TODO: be smarter
+				frees_.sort();
+
+				uint start = 0;
+				while (start + count <= frees_.length) {
+					if (frees_[start + count - 1] == frees_[start] + count - 1)
+						break;
+					++start;
+				}
+
+				if (start + count <= frees_.length) {
+					index = frees_[start];
+
+					frees_ = frees_[0..start] ~ frees_[start + count..$]; // TODO: find starting from the end, then manually copy + pop
+				}
 			}
 
-			auto index = registers_;
-			registers_ += count;
-			foreach (i; 0..count)
-				refs_ ~= cast(size_t)1;
+			if (index == registers_) {
+				registers_ += count;
+				refs_.length = registers_;
+			}
+
+			foreach (i; index..index + count) {
+				assert(refs_[i] == 0);
+				refs_[i] = 1;
+			}
 
 			return Value(Value.Kind.Register, index);
 		}
+
+		return Value(Value.Kind.Register, uint.max);
 	}
 
 	auto aquire(Value v) {
+		assert(!frees_.canFind(v.value), format("aquiring freed register %s", v.value));
 		if (v.kind == Value.Kind.Register)
 			++refs_[v.value];
 		return v;
@@ -498,10 +578,12 @@ private:
 			if (v.kind == Value.Kind.Register) {
 				if (refs_[v.value] > 0) {
 					--refs_[v.value];
-					if (refs_[v.value] == 0)
+					if (refs_[v.value] == 0) {
+						assert(!frees_.canFind(v.value), format("double releasing register %s", v.value));
 						frees_ ~= v.value;
+					}
 				} else {
-					assert(!frees_.canFind(v.value), format("double releasing register %s", v.value));
+					assert(false, format("double releasing register %s", v.value));
 				}
 			}
 		}

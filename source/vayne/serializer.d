@@ -153,8 +153,8 @@ enum : uint { FormatVersion = 1 };
 
 struct ByteStreamWriter {
 	void put(T)(T x) if (isIntegral!T) {
-		if (stream_.length - offset_ < T.sizeof)
-			stream_.length += 2 * 1024;
+		if (offset_ + T.sizeof > stream_.length)
+			stream_.length += 16 * 1024;
 		// TODO: always write as little-endian
 		*cast(T*)(stream_.ptr + offset_) = x;
 		length_ += T.sizeof;
@@ -162,8 +162,8 @@ struct ByteStreamWriter {
 	}
 
 	void put(T)(T x) if (is(Unqual!T == string)) {
-		if (stream_.length - offset_ < T.sizeof)
-			stream_.length += max(2 * 1024, x.length + uint.sizeof);
+		if (offset_ + T.sizeof > stream_.length)
+			stream_.length += 16 * 1024;
 
 		put!uint(cast(uint)x.length);
 

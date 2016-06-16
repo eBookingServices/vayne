@@ -138,10 +138,6 @@ struct Source {
 	@property auto end() const {
 		return buffer.ptr + buffer.length;
 	}
-
-	@property auto empty() const {
-		return buffer.length == 0;
-	}
 }
 
 
