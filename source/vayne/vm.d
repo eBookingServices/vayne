@@ -31,6 +31,11 @@ class VMException : Exception {
 }
 
 
+private template isWriterObject(T) {
+	enum isWriterObject = isOutputRange!(T, char) || __traits(compiles, T.init.write(""));
+}
+
+
 struct VM(uint options = VMOptions.Default) {
 	static struct Error {
 		string msg;
@@ -91,13 +96,13 @@ struct VM(uint options = VMOptions.Default) {
 		return errorHandler_;
 	}
 
-	void execute(T)(ref T output, Globals globals) if (isOutputRange!(T, char)) {
+	void execute(T)(ref T output, Globals globals) if (isWriterObject!T) {
 		globals_ = globals;
 
 		execute(output);
 	}
 
-	void execute(T)(ref T output) if (isOutputRange!(T, char)) {
+	void execute(T)(ref T output) if (isWriterObject!T) {
 		Instr instr = instrs_[0];
 		ulong ip;
 
@@ -136,7 +141,11 @@ struct VM(uint options = VMOptions.Default) {
 				case Throw:
 					throw new Exception(getArgV!0.toString);
 				case Output:
-					output.put(getArgV!0.get!string);
+					static if (isOutputRange!(T, char)) {
+						output.put(getArgV!0.get!string);
+					} else {
+						output.write(getArgV!0.get!string);
+					}
 
 					static if (options & VMOptions.PrintOutput) {
 						write(getArgV!0.get!string);
@@ -295,15 +304,15 @@ struct VM(uint options = VMOptions.Default) {
 					break;
 				case Call:
 					auto func = getArgV!1;
-					func.call(regs_[instr.arg!2..instr.arg!2 + instr.arg!3], regs_[instr.arg!0]);
+					func.call(regs_[instr.arg!0], regs_[instr.arg!2..instr.arg!2 + instr.arg!3]);
 					break;
 				case DispatchCall:
 					auto func = getArgV!1;
 					if (dispatchArg_) {
-						func.call(regs_[instr.arg!2..instr.arg!2 + instr.arg!3], regs_[instr.arg!0]);
+						func.call(regs_[instr.arg!0], regs_[instr.arg!2..instr.arg!2 + instr.arg!3]);
 						dispatchArg_ = false;
 					} else {
-						func.call(regs_[1 + instr.arg!2..instr.arg!2 + instr.arg!3], regs_[instr.arg!0]);
+						func.call(regs_[instr.arg!0], regs_[1 + instr.arg!2..instr.arg!2 + instr.arg!3]);
 					}
 					break;
 				}

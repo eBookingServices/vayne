@@ -1,0 +1,26 @@
+{{#def content}}
+	{{td, td.iterable}}</br>
+	{{@ td, iterable as obj }}
+	<h1>{{header}}</h1>
+	{{? obj.length()}}
+		<ol>
+			{{* key, value; obj}}
+				<li>{{ key }} =&gt; {{ value }}</li>
+			{{/}}
+		</ol>
+	{{:}}
+		{{~ "empty" }}
+	{{/}}
+	<div>
+	{{~ "footer" }}
+	</div>
+	{{/}}
+
+	{{req}}</br>
+	{{res}}</br>
+	{{req.session}}</br>
+	{{req.session.isKeySet("mooo")}}</br>
+{{#/}}
+
+{{&layout}}
+{{#layout(content)}}

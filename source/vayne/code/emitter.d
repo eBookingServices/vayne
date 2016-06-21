@@ -286,19 +286,26 @@ private:
 	auto emitDispatchOp(DispatchOp node) {
 		debug mixin(Guard);
 
-		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
+		auto obj = emitExpression(node.children[0]);
+		scope (exit) release(obj);
+
 		auto key = constant(ConstantSlot.Type.String, node.target.value);
 
-		emit(OpCode.Element, node.tok.loc, target, target, key);
+		auto target = register();
+		emit(OpCode.Element, node.tok.loc, target, obj, key);
 		return target;
 	}
 
 	auto emitDispatchOpForCall(DispatchOp node, Value obj) {
-		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
-		emit(OpCode.Move, node.tok.loc, obj, target);
+		auto expr = emitExpression(node.children[0]);
+		scope (exit) release(expr);
 
 		auto key = constant(ConstantSlot.Type.String, node.target.value);
-		emit(OpCode.Dispatch, node.tok.loc, target, obj, key);
+
+		emit(OpCode.Move, node.tok.loc, obj, expr);
+
+		auto target = register();
+		emit(OpCode.Dispatch, node.tok.loc, target, expr, key);
 		return target;
 	}
 
@@ -409,7 +416,8 @@ private:
 		}
 
 		emitStatement(node.children[$ - 1]);
-		emit(OpCode.PopScope, node.tok.loc, Value(Value.Kind.Immediate, scopes));
+		if (scopes)
+			emit(OpCode.PopScope, node.tok.loc, Value(Value.Kind.Immediate, scopes));
 
 		foreach (expr; exprs)
 			release(expr);

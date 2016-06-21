@@ -416,13 +416,14 @@ private struct ExprParser {
 
 	WithExpression parseWithExpression() {
 		if (auto expr = parseExpression()) {
+			Token name;
 			if (tok_.keyword(Token.KeywordKind.As)) {
 				eat();
 				if (!tok_.ident())
 					throw new ExprParserException(tok_, format("expected an identifier following 'as', not '%s'", tok_));
-				auto name = eat();
-				return create!WithExpression(expr.tok, expr, name);
+				name = eat();
 			}
+			return create!WithExpression(expr.tok, expr, name);
 		}
 		return null;
 	}

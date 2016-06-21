@@ -1,17 +1,34 @@
 module vayne.value;
 
 
+import std.algorithm;
 import std.array;
 import std.conv;
 import std.format;
+import std.meta;
 import std.range;
 import std.traits;
 
 import std.stdio;
 
 
-private template isInternal(string field) {
-	enum isInternal = (field.length >= 2 && field[0..2] == "__") || (field == "this");
+private template isCompatibleStorageClass(size_t Class) {
+	enum isCompatibleStorageClass = Class == 0;
+}
+
+
+private template isCompatibleArgType(T) {
+	enum isCompatibleArgType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || (isArray!T && is(Unqual!(typeof(T.init[0])) == Value)));
+}
+
+
+private template isCompatibleReturnType(T) {
+	enum isCompatibleReturnType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || isArray!T);
+}
+
+
+private template isCompatibleFunction(T) {
+	enum isCompatibleFunction = isCompatibleReturnType!(ReturnType!T) && allSatisfy!(isCompatibleArgType, ParameterTypeTuple!T) && allSatisfy!(isCompatibleStorageClass, ParameterStorageClassTuple!T);
 }
 
 
@@ -59,6 +76,7 @@ private static void functionWrapper(T)(void* ptr, void* self, Value[] args, ref 
 struct Value {
 	enum Type : ubyte {
 		Undefined,
+		Null,
 		Bool,
 		Integer,
 		Float,
@@ -68,6 +86,10 @@ struct Value {
 		AssocArray,
 		Object,
 		Pointer,
+	}
+
+	this(typeof(null)) {
+		type_ = Type.Null;
 	}
 
 	this(in Value x) {
@@ -80,17 +102,17 @@ struct Value {
 		storage_.b = x;
 	}
 
-	this(T)(in T x) if (isScalarType!T && !isBoolean!T && !isFloatingPoint!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isScalarType!T && !isBoolean!T && !isFloatingPoint!T) {
 		type_ = Type.Integer;
 		storage_.l = cast(long)x;
 	}
 
-	this(T)(in T x) if (isScalarType!T && !isBoolean!T && isFloatingPoint!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isScalarType!T && !isBoolean!T && isFloatingPoint!T) {
 		type_ = Type.Float;
 		storage_.d = cast(double)x;
 	}
 
-	this(T)(in T x) if (isSomeString!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isSomeString!T) {
 		type_ = Type.String;
 		storage_.s = x;
 	}
@@ -107,15 +129,19 @@ struct Value {
 		}
 	}
 
-	this(T)(in T x) if (isSomeFunction!T) {
-		type_ = Type.Function;
-		static if (isFunctionPointer!T) {
-			storage_.f.ptr = x;
+	this(T)(T x) if (isSomeFunction!T && isCompatibleFunction!T) {
+		if (x !is null) {
+			type_ = Type.Function;
+			static if (isFunctionPointer!T) {
+				storage_.f.ptr = x;
+			} else {
+				storage_.f.self = x.ptr;
+				storage_.f.ptr = cast(void*)x.funcptr;
+			}
+			storage_.f.wrapper = &functionWrapper!T;
 		} else {
-			storage_.f.self = x.ptr;
-			storage_.f.ptr = cast(void*)x.funcptr;
+			type_ = Type.Null;
 		}
-		storage_.f.wrapper = &functionWrapper!T;
 	}
 
 	this(T)(in T x) if (isAssociativeArray!T) {
@@ -124,23 +150,64 @@ struct Value {
 			storage_.aa[Value(k)] = Value(v);
 	}
 
-	this(T)(ref T x) if (is(Unqual!T == struct)) {
-		type_ = Type.Object;
-		foreach (Field; __traits(allMembers, T)) {
-			static if(!isInternal!Field) {
-				enum isMemberFunction = is(typeof(&__traits(getMember, x, Field)) == delegate);
-				static if (isMemberFunction) {
-					storage_.o[Field] = Value(&__traits(getMember, x, Field));
-				} else {
-					storage_.o[Field] = Value(__traits(getMember, x, Field));
-				}
-			}
+	this(T)(in T x) if (is(Unqual!T == enum)) {
+		alias BaseType = Unqual!(OriginalType!T);
+		this(cast(BaseType)x);
+	}
+
+	this(T)(in T x) if (isPointer!T && !isSomeFunction!T) {
+		if (x !is null) {
+			this(*x); // TODO: cyclic refs?
+		} else {
+			this(null);
 		}
 	}
 
-	this(T)(ref T x) if (isPointer!T && !isFunctionPointer!T) {
-		type_ = Type.Pointer;
-		storage_.p = x;
+	this(T)(ref T x) if (is(Unqual!T == struct)) {
+		type_ = Type.Object;
+		bindMembers(x);
+	}
+
+	this(T)(T x) if (is(Unqual!T == class) || is(Unqual!T == interface)) {
+		if (x !is null) {
+			type_ = Type.Object;
+			bindMembers(x);
+		} else {
+			type_ = Type.Null;
+		}
+	}
+
+	private void bindMembers(T)(auto ref T x) {
+		foreach (Member; FieldNameTuple!T) {
+			static if ((Member != "") && (__traits(getProtection, __traits(getMember, x, Member)) == "public")) {
+				enum isMemberVariable = is(typeof(() { __traits(getMember, x, Member) = __traits(getMember, x, Member).init; }));
+				static if (isMemberVariable) {
+					storage_.o[Member] = Value(__traits(getMember, x, Member));
+				}
+			}
+		}
+
+		enum NotCallableNames = ["__ctor", "opAssign", "opIndexAssign", "opCast"];
+		enum NotBindableNames = ["opIndex"];
+
+		foreach (Member; __traits(derivedMembers, T)) {
+			enum callable = !NotCallableNames.canFind(Member);
+			static if (callable && is(typeof(&__traits(getMember, x, Member)) == delegate) && isCompatibleFunction!(typeof(&__traits(getMember, x, Member)))) {
+				enum bindable = !NotBindableNames.canFind(Member);
+
+				alias Args = ParameterTypeTuple!(typeof(&__traits(getMember, x, Member)));
+
+				static if (bindable) {
+					storage_.o[Member] = Value(&__traits(getMember, x, Member));
+				}
+
+				static if ((Member == "toString") && (Args.length == 0)) {
+					storage_.o["__tostring"] = Value(&__traits(getMember, x, Member));
+				} else static if ((Member == "opIndex")) {
+					//storage_.o["__index"] = Value(&__traits(getMember, x, Member));
+				}
+			}
+		}
 	}
 
 	@property Type type() const pure nothrow {
@@ -149,13 +216,14 @@ struct Value {
 
 	@property auto length() const {
 		final switch(type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
 		case Float:
 		case Function:
 		case Pointer:
-			throw new Exception(format("length '%s' not allowed for type %s", type));
+			throw new Exception(format("length op not allowed for type %s", type));
 		case String:
 		case Array:
 			return storage_.a.length;
@@ -171,6 +239,7 @@ struct Value {
 			throw new Exception(format("compare op '%s' not allowed between types %s and %s", op, type, other.type));
 
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 			return true;
 		case Bool:
@@ -209,6 +278,7 @@ struct Value {
 			return Value(mixin("storage_.l " ~ op ~ " other.storage_.l"));
 		case Float:
 			return Value(mixin("storage_.d " ~ op ~ " other.storage_.d"));
+		case Null:
 		case Undefined:
 		case String:
 		case Function:
@@ -228,6 +298,7 @@ struct Value {
 		case Float:
 			storage_.d = mixin(op ~ "storage_.d");
 			break;
+		case Null:
 		case Undefined:
 		case Bool:
 		case String:
@@ -254,6 +325,7 @@ struct Value {
 					return storage_.l.hashOf;
 				case Float:
 					return storage_.d.hashOf;
+				case Null:
 				case Undefined:
 					return 0;
 				case Bool:
@@ -289,6 +361,8 @@ struct Value {
 		final switch (type) with (Type) {
 		case Undefined:
 			return "undefined";
+		case Null:
+			return "null";
 		case Bool:
 			return storage_.b.to!T;
 		case Integer:
@@ -308,6 +382,11 @@ struct Value {
 		case AssocArray:
 			return storage_.aa.to!T;
 		case Object:
+			if (auto tostring = "__tostring" in storage_.o) {
+				Value result;
+				tostring.call(result, null);
+				return result.get!T;
+			}
 			return storage_.o.to!T;
 		case Pointer:
 			static if ((void*).sizeof == 4) {
@@ -330,6 +409,7 @@ struct Value {
 			return storage_.s.to!T;
 		case Pointer:
 			return cast(T)storage_.p;
+		case Null:
 		case Undefined:
 		case Function:
 		case Array:
@@ -341,6 +421,7 @@ struct Value {
 
 	T get(T)() const if (isBoolean!T) {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 			return false;
 		case Bool:
@@ -363,6 +444,7 @@ struct Value {
 
 	T get(T)() const if (isPointer!T) {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 			return null;
 		case Pointer:
@@ -381,6 +463,7 @@ struct Value {
 
 	T get(T)() const if (is(Unqual!T == Function)) {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -398,6 +481,7 @@ struct Value {
 
 	ref auto keys() const {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -417,6 +501,7 @@ struct Value {
 
 	bool has(in Value index) const {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -441,6 +526,7 @@ struct Value {
 
 	bool has(in Value index, Value* pout) const {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -481,6 +567,7 @@ struct Value {
 
 	ref auto get(in Value index) const {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -513,6 +600,7 @@ struct Value {
 
 	ref auto slice(in Value start, in Value end) const {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -531,6 +619,7 @@ struct Value {
 
 	ref auto key(in Value index) const {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -550,6 +639,7 @@ struct Value {
 
 	int opApply(int delegate(Value) dg) {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -587,6 +677,7 @@ struct Value {
 
 	int opApply(int delegate(size_t, Value) dg) {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -625,6 +716,7 @@ struct Value {
 
 	int opApply(int delegate(Value, Value) dg) {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -662,6 +754,7 @@ struct Value {
 
 	int opApply(int delegate(string, Value) dg) {
 		final switch (type) with (Type) {
+		case Null:
 		case Undefined:
 		case Bool:
 		case Integer:
@@ -689,9 +782,15 @@ struct Value {
 		return 0;
 	}
 
-	void call(Value[] args, ref Value ret) {
+	void call(ref Value ret, Value[] args) const {
 		auto func = get!Function();
 		func.wrapper(func.ptr, func.self, args, ret);
+	}
+
+	void call(Args...)(ref Value ret, Args args) const {
+		Value[Args.length] argValues = [ args ];
+		auto func = get!Function();
+		func.wrapper(func.ptr, func.self, argValues, ret);
 	}
 
 	static struct Function {

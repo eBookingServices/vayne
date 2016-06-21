@@ -1,0 +1,7 @@
+name "example"
+description "Vayne template example"
+authors "Márcio Martins"
+copyright "Copyright © 2016, Márcio Martins"
+license "MIT"
+dependency "vayne" version="~master"
+dependency "vibe-d" version=">=0.7.28"

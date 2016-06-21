@@ -3,11 +3,21 @@ module vayne.lib;
 
 import std.algorithm;
 import std.array;
+import std.conv;
 
 import vayne.value;
 
 
-void bindLibDefault(Value[string] globals) {
+template bindVars(size_t i, alias Container, Vars...) {
+	static if(i < Vars.length) {
+		enum bindVars = Vars.length ? (__traits(identifier, Container) ~ "[\"" ~ __traits(identifier, Vars[i]) ~ "\"]=Value(Vars[" ~ i.to!string ~ "]);\n" ~ bindVars!(i + 1, Container, Vars)) : "";
+	} else {
+		enum bindVars = "";
+	}
+}
+
+
+void bindLibDefault(ref Value[string] globals) {
 	static long length(Value x) {
 		return cast(long)x.length;
 	}
