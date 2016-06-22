@@ -99,5 +99,5 @@ void handleRequest(HTTPServerRequest req, HTTPServerResponse res) {
 	td.iterable["2"] = "The number two";
 	td.iterable["3"] = "The number three";
 
-	res.renderTemplate!("index.html", td, req, res);
+	res.renderTemplate!("index.html", td);
 }

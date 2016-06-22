@@ -151,17 +151,18 @@ struct SourceLoc {
 bool balancedQuotes(Range)(Range range) {
 	char open = '\0';
 	char last = '\0';
-	foreach(ch; range) {
+
+	foreach (ch; range) {
 		if (last != '\\') {
-			switch(ch) {
+			switch (ch) {
 			case '"':
-				open = (open == '"') ? '\0' : '"';
-				break;
 			case '\'':
-				open = (open == '\'') ? '\0' : '\'';
-				break;
 			case '`':
-				open = (open == '`') ? '\0' : '`';
+				if (open == ch) {
+					open = '\0';
+				} else if (open == '\0') {
+					open = ch;
+				}
 				break;
 			default:
 				break;
@@ -175,6 +176,7 @@ bool balancedQuotes(Range)(Range range) {
 
 size_t countLines(string x) {
 	size_t count;
+
 	foreach(i; 0..x.length)
 		count += (x.ptr[i] == '\n');
 	return count;
