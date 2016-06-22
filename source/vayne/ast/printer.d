@@ -32,6 +32,17 @@ class Printer(Appender) : Visitor {
 		node.children[0].accept(this);
 	}
 
+	override void visit(PrefixOp node) {
+		app.put(node.tok.toString);
+
+		node.children[0].accept(this);
+	}
+
+	override void visit(SuffixOp node) {
+		node.children[0].accept(this);
+		app.put(node.tok.toString);
+	}
+
 	override void visit(BinaryOp node) {
 		node.children[0].accept(this);
 		app.put(" ");

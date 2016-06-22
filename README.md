@@ -29,7 +29,7 @@ Compiles source text/html into a bytecode to be interpreted at run time.
 	{{&& fileName }} - Embed external file as mime-encoded content
 	{{* key, value; iterable }} {{key}} {{value}} {{/}} - Iterate any iteratable symbol
 	{{? expr }} true case {{: [expr] }} else case {{/}}
-	{{@ expr0, expr2 as ident }} - Create symbol scopes or aliases with expressions. For symbol scopes, expression must evalute to an object or associative array.
+	{{@ expr0, expr2 as ident }} - Create symbol scopes or named copy of expressions. For symbol scopes, expression must evalute to an object or associative array.
 	{{! comment }} - Comment
 	{{ expr }} - Write expression to output with automatic HTML escaping
     {{{ expr }}} - Write expression to output without escaping

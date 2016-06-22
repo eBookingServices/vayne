@@ -89,6 +89,10 @@ private:
 			return emitBinaryOp(binop);
 		} else if (auto uniop = cast(UnaryOp)node) {
 			return emitUnaryOp(uniop);
+		} else if (auto preop = cast(PrefixOp)node) {
+			return emitPrefixOp(preop);
+		} else if (auto sufop = cast(SuffixOp)node) {
+			return emitSuffixOp(sufop);
 		} else if (auto condexpr = cast(ConditionalExpression)node) {
 			return emitConditionalExpression(condexpr);
 		} else if (auto indexop = cast(IndexOp)node) {
@@ -164,6 +168,50 @@ private:
 			return expr;
 		default:
 			assert(false, "unimplemented unary op " ~ node.tok.toString);
+		}
+	}
+
+	auto emitPrefixOp(PrefixOp node) {
+		debug mixin(Guard);
+
+		auto expr = registerize(node.tok.loc, emitExpression(node.children[0]));
+		scope(exit) release(expr);
+
+		switch (node.tok.name) {
+		case "++":
+			auto target = register();
+			emit(OpCode.Increment, node.tok.loc, expr);
+			emit(OpCode.Move, node.tok.loc, target, expr);
+			return target;
+		case "--":
+			auto target = register();
+			emit(OpCode.Decrement, node.tok.loc, expr);
+			emit(OpCode.Move, node.tok.loc, target, expr);
+			return target;
+		default:
+			assert(false, "unimplemented prefix op " ~ node.tok.toString);
+		}
+	}
+
+	auto emitSuffixOp(SuffixOp node) {
+		debug mixin(Guard);
+
+		auto expr = registerize(node.tok.loc, emitExpression(node.children[0]));
+		scope(exit) release(expr);
+
+		switch (node.tok.name) {
+		case "++":
+			auto target = register();
+			emit(OpCode.Move, node.tok.loc, target, expr);
+			emit(OpCode.Increment, node.tok.loc, expr);
+			return target;
+		case "--":
+			auto target = register();
+			emit(OpCode.Move, node.tok.loc, target, expr);
+			emit(OpCode.Decrement, node.tok.loc, expr);
+			return target;
+		default:
+			assert(false, "unimplemented suffix op " ~ node.tok.toString);
 		}
 	}
 
@@ -409,6 +457,12 @@ private:
 				++scopes;
 				emit(OpCode.PushScope, child.tok.loc,  expr);
 			} else {
+				auto copy = register();
+				scope(exit) release(copy);
+
+				emit(OpCode.Move, child.tok.loc, copy, expr);
+				swap(copy, expr);
+
 				addSymbol(child.name.value, aquire(expr));
 			}
 

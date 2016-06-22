@@ -78,6 +78,24 @@ class UnaryOp : Node {
 }
 
 
+class PrefixOp : Node {
+	this(Token tok, Node expr) {
+		super(tok, expr);
+	}
+
+	mixin VisitorInterface;
+}
+
+
+class SuffixOp : Node {
+	this(Token tok, Node expr) {
+		super(tok, expr);
+	}
+
+	mixin VisitorInterface;
+}
+
+
 class BinaryOp : Node {
 	this(Token tok, Node lexpr, Node rexpr) {
 		super(tok, lexpr, rexpr);

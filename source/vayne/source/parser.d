@@ -502,6 +502,8 @@ private struct ExprParser {
 
 			if (auto expr = parseUnaryOp())
 				return expr;
+			if (auto expr = parsePrefixOp())
+				return expr;
 			break;
 		case Literal:
 			return parseLiteralExpr();
@@ -564,6 +566,21 @@ private struct ExprParser {
 			if (!expr)
 				throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
 			return create!UnaryOp(op, expr);
+		}
+		return null;
+	}
+
+	Node parsePrefixOp() {
+		switch(tok_.name) {
+		case "--":
+		case "++":
+			auto op = eat();
+			auto expr = parseExpressionPrimary();
+			if (!expr)
+				throw new ExprParserException(tok_, format("expected an expression, not '%s'", tok_));
+			return create!PrefixOp(op, expr);
+		default:
+			break;
 		}
 		return null;
 	}
@@ -631,6 +648,10 @@ private struct ExprParser {
 			}
 
 			return create!FunctionCall(op, expr, args);
+		case "--":
+		case "++":
+			auto op = eat();
+			return create!SuffixOp(op, expr);
 		default:
 			break;
 		}
