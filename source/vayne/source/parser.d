@@ -678,12 +678,12 @@ private struct ExprParser {
 		switch(name.front) with (OperatorPriority) {
 		case '&':
 		case '|':
-			return (name.length == 1) ? Bitwise : Logic;
+			return (name.length == 1) ? 0/*Bitwise*/ : Logic;
 		case '>':   // >, >=, >>, >>=
 		case '<':   // <, <=, <<, <<=
-			return ((name.length == 1) || (name[1] == '=')) ? Logic : Bitwise;
+			return ((name.length == 1) || (name[1] == '=')) ? Logic : 0/*Bitwise*/;
 		case '^':   // ^, ^=, ^^, ^^=
-			return ((name.length == 1) || (name[1] == '=')) ? Bitwise : Algebraic;
+			return ((name.length == 1) || (name[1] == '=')) ? 0/*Bitwise*/ : Algebraic;
 		case '+':
 		case '-':
 			return (name.length == 1) ? Arithmetic : 0;
@@ -698,7 +698,7 @@ private struct ExprParser {
 			return (name.length == 2) ? Logic : 0;
 		default:
 			if ((name.length == 2) && (name == "in"))
-				return Bitwise;
+				return 0/*Bitwise*/;
 			break;
 		}
 		return 0;
