@@ -80,7 +80,7 @@ int main(string[] args) {
 
 		if (!outputDir.empty) {
 			try {
-				mkdirRecurse(outputDir);
+				mkdirRecurse(target.dirName);
 			} catch(Throwable) {
 			}
 		}
