@@ -4,7 +4,10 @@ module vayne.lib;
 import std.algorithm;
 import std.array;
 import std.conv;
+import std.format;
 import std.string;
+import std.utf;
+
 
 import vayne.value;
 
@@ -53,11 +56,11 @@ void bindLibBasic(ref Value[string] globals) {
 		return x.get!bool;
 	}
 
-	static string translate(Value[] x) {
-		return x[0].get!string;
+	static string escape(Value x) {
+		return escapeHTML(x.get!string);
 	}
 
-	static string escape(Value[] x) {
+	static string translate(Value[] x) {
 		return x[0].get!string;
 	}
 
@@ -120,10 +123,53 @@ void bindLibString(ref Value[string] globals) {
 	globals["indexOf"] = Value(&indexOf);
 	globals["toLower"] = Value(&toLower);
 	globals["toUpper"] = Value(&toUpper);
+
+	globals["escapeHTML"] = Value(&escapeHTML);
 }
 
 
 void bindLibDefault(ref Value[string] globals) {
 	bindLibBasic(globals);
 	bindLibString(globals);
+}
+
+
+static string escapeHTML(string x) {
+	auto app = appender!string;
+	app.reserve(8 + x.length + (x.length >> 1));
+
+	foreach (ch; x.byDchar) {
+		switch (ch) {
+		case '"':
+			app.put("&quot;");
+			break;
+		case '\'':
+			app.put("&#39;");
+			break;
+		case 'a': .. case 'z':
+			goto case;
+		case 'A': .. case 'Z':
+			goto case;
+		case '0': .. case '9':
+			goto case;
+		case ' ', '\t', '\n', '\r', '-', '_', '.', ':', ',', ';',
+			'#', '+', '*', '?', '=', '(', ')', '/', '!',
+			'%' , '{', '}', '[', ']', '$', '^', '~':
+			app.put(cast(char)ch);
+			break;
+		case '<':
+			app.put("&lt;");
+			break;
+		case '>':
+			app.put("&gt;");
+			break;
+		case '&':
+			app.put("&amp;");
+			break;
+		default:
+			formattedWrite(&app, "&#%d;", cast(uint)ch);
+			break;
+		}
+	}
+	return app.data;
 }
