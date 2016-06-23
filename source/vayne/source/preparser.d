@@ -63,8 +63,10 @@ private:
 				errors = error.msg;
 			}
 
-			foreach_reverse (context; contexts_)
-				errors ~= format("\n> %s", mgr_.loc(context.loc));
+			if (!contexts_.empty) {
+				foreach_reverse (context; contexts_[0..$-1])
+					errors ~= format("\n> %s", mgr_.loc(context.loc));
+			}
 		}
 
 		throw new Exception(errors);
