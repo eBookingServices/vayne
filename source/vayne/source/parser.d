@@ -20,7 +20,19 @@ struct ParserOptions {
 }
 
 
-class ParserException : Exception {
+class ParserErrorsException : Exception {
+	this(string[] errors) {
+		assert(!errors.empty);
+		super(errors[0]);
+
+		this.errors = errors;
+	}
+
+	string[] errors;
+}
+
+
+private class ParserException : Exception {
 	this(SourceLoc loc, string msg) {
 		super(msg);
 
@@ -49,21 +61,20 @@ private struct Parser {
 
 private:
 	Node parse() {
-		string errors;
-
 		try {
-			return parse(source_);
+			if (auto root = parse(source_))
+				return root;
 		} catch(Exception error) {
 			if (auto ctxError = cast(ContextException)error) {
-				errors = format("%s: %s", mgr_.loc(ctxError.loc), error.msg);
+				errors_ ~= format("%s: %s", mgr_.loc(ctxError.loc), error.msg);
 			} else if (auto parserError = cast(ParserException)error) {
-				errors = format("%s: %s", mgr_.loc(parserError.loc), error.msg);
+				errors_ ~= format("%s: %s", mgr_.loc(parserError.loc), error.msg);
 			} else {
-				errors = error.msg;
+				errors_ ~= error.msg;
 			}
 		}
 
-		throw new Exception(errors);
+		throw new ParserErrorsException(errors_);
 	}
 
 	Node parse(Source source) {
@@ -102,8 +113,8 @@ private:
 
 			try {
 				compile(context, source.buffer[context.cursor..context.cursor + indexClose], open, close);
-			} catch (ExprParserException error) {
-				throw new ParserException(context.loc, error.msg);
+			} catch (Exception error) {
+				errors_ ~= format("%s: %s", mgr_.loc(context.loc), error.msg);
 			}
 
 			context.advance(indexClose + close.length);
@@ -118,12 +129,10 @@ private:
 
 		context.advance(context.remaining.length);
 
-		/*foreach(name, values; settings) {
-			if (values.length > 1)
-				throw new ParserException(("missing pop for '", name, "' - stack is not empty"), context);
-		}*/
-
 		assert(insertStack_.empty);
+
+		if (!errors_.empty)
+			return null;
 
 		return new Module(Token(context.loc), [ insert_ ]);
 	}
@@ -183,8 +192,10 @@ private:
 	void close(Context context, string content) {
 		context.close();
 
-		insert_ = insertStack_.back;
-		insertStack_.popBack;
+		if (insertStack_.length) {
+			insert_ = insertStack_.back;
+			insertStack_.popBack;
+		}
 	}
 
 	void conditional(Context context, string content) {
@@ -245,7 +256,10 @@ private:
 			values.popFront;
 
 			auto line = values.front.to!uint;
-			context.loc = SourceLoc(id, line, 0);
+			values.popFront;
+
+			auto column = values.front.splitter(' ').front.to!uint;
+			context.loc = SourceLoc(id, line, column);
 			break;
 		default:
 			throw new ParserException(context.loc, format("unknown meta type '%s'", type));
@@ -315,10 +329,12 @@ private:
 
 	SourceManager* mgr_;
 	ParserOptions options_;
+
+	string[] errors_;
 }
 
 
-class ExprParserException : Exception {
+private class ExprParserException : Exception {
 	this(Token tok, string msg) {
 		super(msg);
 		this.tok = tok;

@@ -57,79 +57,103 @@ struct CompiledCode {
 }
 
 
+class CompileErrorsException : Exception {
+	this(string[] errors) {
+		assert(!errors.empty);
+		super(errors[0]);
+
+		this.errors = errors;
+	}
+
+	string[] errors;
+}
+
+
 CompiledCode compile(string fileName, CompilerOptions options) {
-	SourceManagerOptions mgrOptions;
-	mgrOptions.search ~= options.search;
-	mgrOptions.extension = options.ext;
+	try {
+		SourceManagerOptions mgrOptions;
+		mgrOptions.search ~= options.search;
+		mgrOptions.extension = options.ext;
 
-	auto mgr = SourceManager(mgrOptions);
-	auto src = mgr.open(fileName);
+		auto mgr = SourceManager(mgrOptions);
+		auto src = mgr.open(fileName);
 
-	PreParserOptions preOptions;
-	preOptions.lineNumbers = options.lineNumbers;
+		PreParserOptions preOptions;
+		preOptions.lineNumbers = options.lineNumbers;
 
-	mgr.set(src.id, preparse(mgr, src.id, preOptions));
+		mgr.set(src.id, preparse(mgr, src.id, preOptions));
 
-	if (options.preparsePrint)
-		writeln(mgr.get(src.id).buffer);
+		if (options.preparsePrint)
+			writeln(mgr.get(src.id).buffer);
 
-	ParserOptions parserOptions;
-	parserOptions.compress = options.compress ? CompressOptions.defaults : CompressOptions.none;
+		ParserOptions parserOptions;
+		parserOptions.compress = options.compress ? CompressOptions.defaults : CompressOptions.none;
 
-	auto ast = parse(mgr, src.id, parserOptions);
-	if (options.astPrint)
-		ast.print.writeln;
+		auto ast = parse(mgr, src.id, parserOptions);
+		if (options.astPrint)
+			ast.print.writeln;
 
-	Emitter emitter;
-	emitter.emitModule(cast(Module)ast);
+		Emitter emitter;
+		emitter.emitModule(cast(Module)ast);
 
-	if (options.constPrint) {
-		foreach (i, k; emitter.constants)
-			writeln(format("%4d %-16s %s", i, k.type, k.value));
-	}
-
-	if (options.instrPrint || options.byteCodePrint) {
-		auto fmt = "%5d " ~ (options.byteCodePrint ? "%-58s" : "%-24s");
-
-		if (options.lineNumbers)
-			fmt ~= " ; %s";
-
-		if (options.lineNumbers) {
-			foreach (ip, instr; emitter.instrs)
-				writeln(format(fmt, ip, options.byteCodePrint ? instr.toStringFull : instr.toString, mgr.loc(emitter.locs[ip])));
-		} else {
-			foreach (ip, instr; emitter.instrs)
-				writeln(format(fmt, ip, options.byteCodePrint ? instr.toStringFull : instr.toString));
+		if (options.constPrint) {
+			foreach (i, k; emitter.constants)
+				writeln(format("%4d %-16s %s", i, k.type, k.value));
 		}
-	}
 
-	CompiledCode result;
-	with (result) {
-		registerCount = emitter.registerCount;
+		if (options.instrPrint || options.byteCodePrint) {
+			auto fmt = "%5d " ~ (options.byteCodePrint ? "%-58s" : "%-24s");
 
-		instrs = emitter.instrs;
-		locs = emitter.locs;
-		sources = mgr.sourceNames;
-		dependencies = mgr.dependencies.map!(x => mgr.fileNames[x]).array;
+			if (options.lineNumbers)
+				fmt ~= " ; %s";
 
-		constants.reserve(emitter.constants.length);
-		foreach (i, k; emitter.constants) {
-			final switch (k.type) with (Emitter.ConstantSlot.Type) {
-			case Boolean:
-				constants ~= CompiledCode.Constant(ConstantType.Boolean, k.value);
-				break;
-			case Integer:
-				constants ~= CompiledCode.Constant(ConstantType.Integer, k.value);
-				break;
-			case Float:
-				constants ~= CompiledCode.Constant(ConstantType.Float, k.value);
-				break;
-			case String:
-				constants ~= CompiledCode.Constant(ConstantType.String, k.value);
-				break;
+			if (options.lineNumbers) {
+				foreach (ip, instr; emitter.instrs)
+					writeln(format(fmt, ip, options.byteCodePrint ? instr.toStringFull : instr.toString, mgr.loc(emitter.locs[ip])));
+			} else {
+				foreach (ip, instr; emitter.instrs)
+					writeln(format(fmt, ip, options.byteCodePrint ? instr.toStringFull : instr.toString));
 			}
 		}
-	}
 
-	return result;
+		CompiledCode result;
+		with (result) {
+			registerCount = emitter.registerCount;
+
+			instrs = emitter.instrs;
+			locs = emitter.locs;
+			sources = mgr.sourceNames;
+			dependencies = mgr.dependencies.map!(x => mgr.fileNames[x]).array;
+
+			constants.reserve(emitter.constants.length);
+			foreach (i, k; emitter.constants) {
+				final switch (k.type) with (Emitter.ConstantSlot.Type) {
+				case Boolean:
+					constants ~= CompiledCode.Constant(ConstantType.Boolean, k.value);
+					break;
+				case Integer:
+					constants ~= CompiledCode.Constant(ConstantType.Integer, k.value);
+					break;
+				case Float:
+					constants ~= CompiledCode.Constant(ConstantType.Float, k.value);
+					break;
+				case String:
+					constants ~= CompiledCode.Constant(ConstantType.String, k.value);
+					break;
+				}
+			}
+		}
+
+		return result;
+	} catch (Exception error) {
+		string[] errors;
+
+		if (auto parserErrors = cast(ParserErrorsException)error) {
+			errors = parserErrors.errors;
+		} else {
+			errors ~= error.msg;
+		}
+
+		throw new CompileErrorsException(errors);
+	}
 }

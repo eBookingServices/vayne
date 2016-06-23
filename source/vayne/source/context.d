@@ -22,7 +22,7 @@ class Context {
 	this(Source source) {
 		this.source = source;
 
-		loc = SourceLoc(source.id, 1);
+		loc = SourceLoc(source.id, 1, 0);
 	}
 
 	this(Source source, SourceLoc loc) {

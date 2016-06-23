@@ -132,7 +132,13 @@ int main(string[] args) {
 			std.file.write(depsFileName, appender.data);
 		}
 	} catch (Exception error) {
-		writeln("error: ", error.msg);
+		if (auto compileErrors = cast(CompileErrorsException)error) {
+			foreach (msg; compileErrors.errors)
+				writeln("error: ", msg);
+		} else {
+			writeln("error: ", error.msg);
+		}
+
 		result = 1;
 	}
 

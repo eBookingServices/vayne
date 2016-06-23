@@ -53,10 +53,7 @@ private:
 			++envs_.length;
 			++defs_.length;
 
-			auto result = parse(source_);
-			if (options_.lineNumbers && !isAllWhite(result))
-				result = sourceInfo(SourceLoc(source_.id, 1)) ~ result;
-			return result;
+			return parse(source_, SourceLoc(source_.id, 1, 0));
 		} catch(Exception error) {
 			if (auto ctxError = cast(ContextException)error) {
 				errors = format("%s: %s", mgr_.loc(ctxError.loc), error.msg);
@@ -73,13 +70,13 @@ private:
 		throw new Exception(errors);
 	}
 
-	string parse(Source source) {
-		auto context = new Context(source);
+	string parse(Source source, SourceLoc loc) {
+		auto context = new Context(source, loc);
 		contexts_ ~= context;
-		scope(success) --contexts_.length;
+		scope (success) --contexts_.length;
 
-		Appender!string result;
-		result.reserve(16 * 1024);
+		Appender!string app;
+		app.reserve(16 * 1024);
 
 		const end = context.remaining.length - 2;
 		while (context.cursor < end) {
@@ -95,7 +92,7 @@ private:
 				break;
 
 			if (!def_)
-				result.put(remaining[0..indexOpen]);
+				app.put(remaining[0..indexOpen]);
 			context.advance(indexOpen);
 
 			const contentStart = indexOpen + 2;
@@ -115,14 +112,16 @@ private:
 
 			auto replaced = replacer(context.source.buffer[context.cursor..context.cursor + indexClose], context);
 			if (!def_)
-				result.put(replaced);
+				app.put(replaced);
 			context.advance(indexClose + 2);
 		}
 		context.expectClosed();
 
-		result.put((context.cursor > 0) ? context.remaining() : context.source.buffer);
+		app.put((context.cursor > 0) ? context.remaining() : context.source.buffer);
 
-		return result.data;
+		if (needsLineNumbers(app.data))
+			return sourceInfo(loc) ~ app.data;
+		return app.data;
 	}
 
 	string include(string content, Context context) {
@@ -132,15 +131,14 @@ private:
 
 		string result;
 		if (!embed) {
-			result = parse(source);
-			if (options_.lineNumbers && !isAllWhite(result))
-				result = sourceInfo(SourceLoc(source.id, 1)) ~ result ~ sourceInfo(context.loc);
+			result = parse(source, SourceLoc(source.id, 1, 0));
 		} else {
 			auto name = mgr_.name(source.id);
 			result = format("data:%s;base64,%s", name.mimeType, encode(source.buffer));
-			if (options_.lineNumbers && !isAllWhite(result))
-				result ~= sourceInfo(context.loc);
 		}
+
+		if (needsLineNumbers(result))
+			result ~= sourceInfo(context.loc);
 		return result;
 	}
 
@@ -218,8 +216,11 @@ private:
 			auto top = envs_.length - k - 1;
 			auto env = envs_[top];
 
-			if (auto penv = name in env)
+			if (auto penv = name in env) {
+				if (needsLineNumbers(*penv))
+					return *penv ~ sourceInfo(context.loc);
 				return *penv;
+			}
 
 			auto defs = defs_[top];
 			if (auto pdef = name in defs) {
@@ -267,11 +268,9 @@ private:
 					scope(exit) --envs_.length;
 
 					auto source = mgr_.add(format("#%s at %s", pdef.name, mgr_.name(pdef.loc.id)), pdef.value, pdef.loc.id);
-					auto loc = SourceLoc(source.id, pdef.loc.line, pdef.loc.column);
-					auto result = parse(source);
-
-					if (options_.lineNumbers && !isAllWhite(result))
-						result = sourceInfo(loc) ~ result ~ sourceInfo(context.loc);
+					auto result = parse(source, SourceLoc(source.id, pdef.loc.line, pdef.loc.column));
+					if (needsLineNumbers(result))
+						result ~= sourceInfo(context.loc);
 					return result;
 				}
 			}
@@ -344,10 +343,12 @@ private:
 		return null;
 	}
 
+	auto needsLineNumbers(string content) const {
+		return options_.lineNumbers && !isAllWhite(content);
+	}
+
 	string sourceInfo(SourceLoc loc) {
-		if (options_.lineNumbers)
-			return format("{{;src:%d:%d:%d %s}}", loc.id, loc.line, loc.column, mgr_.name(loc.id));
-		return null;
+		return format("{{;src:%d:%d:%d %s}}", loc.id, loc.line, loc.column, mgr_.name(loc.id));
 	}
 
 private:
