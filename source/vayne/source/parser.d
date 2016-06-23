@@ -138,33 +138,45 @@ private:
 	}
 
 	void compile(Context context, string content, string tagOpen, string tagClose) {
+		void ensureSimpleTag(string tag) {
+			if (tagOpen.length != 2)
+				throw new ParserException(context.loc, format("'%s' not supported for tag '%s'", tagOpen, tag));
+		}
+
 		if (content.length > 0) {
 			auto tag = content[0..1];
 			switch(tag) {
 			case "*":
+				ensureSimpleTag(tag);
 				iterate(context, content);
 				break;
 			case "/":
+				ensureSimpleTag(tag);
 				close(context, content);
 				break;
 			case "?":
-				 conditional(context, content);
-				 break;
+				ensureSimpleTag(tag);
+				conditional(context, content);
+				break;
 			case ":":
+				ensureSimpleTag(tag);
 				orElse(context, content);
 				break;
 			case "~":
 				translate(context, content, tagOpen.length == 2);
 				break;
 			case ";":
+				ensureSimpleTag(tag);
 				meta(context, content);
 				break;
 			case "!":
 				break;
 			case "#":
+				ensureSimpleTag(tag);
 				define(context, content);
 				break;
 			case "@":
+				ensureSimpleTag(tag);
 				withs(context, content);
 				break;
 			case "&":
@@ -195,6 +207,8 @@ private:
 		if (insertStack_.length) {
 			insert_ = insertStack_.back;
 			insertStack_.popBack;
+		} else {
+			assert(errors_.length);
 		}
 	}
 
@@ -213,8 +227,15 @@ private:
 		context.expectOpen("?", ":");
 		content = content[1..$].strip;
 
-		insert_ = insertStack_.back;
-		insertStack_.popBack;
+		if (insertStack_.length) {
+			insert_ = insertStack_.back;
+			insertStack_.popBack;
+		} else {
+			assert(errors_.length);
+			auto ifStmt = cast(IfStatement)insert_.children.back;
+			if (!ifStmt)
+				insert_.children ~= create!IfStatement(Token(context.loc), null, create!StatementBlock(Token(context.loc)), null);
+		}
 
 		auto ifStmt = cast(IfStatement)insert_.children.back;
 		assert(ifStmt !is null);
