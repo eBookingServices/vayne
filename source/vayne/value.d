@@ -535,14 +535,14 @@ struct Value {
 		case Pointer:
 			throw new Exception(format("indexing not allowed for type %s", type));
 		case String:
-			auto i = index.get!ulong;
+			auto i = index.get!size_t;
 			if (i < length) {
 				*pout = Value(storage_.s[i..i + 1]);
 				return true;
 			}
 			return false;
 		case Array:
-			auto i = index.get!ulong;
+			auto i = index.get!size_t;
 			if (i < length) {
 				*pout = (cast(Value*)storage_.a)[i];
 				return true;
@@ -576,12 +576,12 @@ struct Value {
 		case Pointer:
 			throw new Exception(format("indexing not allowed for type %s", type));
 		case String:
-			auto i = index.get!ulong;
+			auto i = index.get!size_t;
 			if (i < length)
 				return Value(storage_.s[i..i + 1]);
 			throw new Exception("out of range");
 		case Array:
-			auto i = index.get!ulong;
+			auto i = index.get!size_t;
 			if (i < length)
 				return (cast(Value*)storage_.a)[i];
 			throw new Exception("out of range");
@@ -611,9 +611,9 @@ struct Value {
 		case Object:
 			throw new Exception(format("slicing not allowed for type %s", type));
 		case String:
-			return Value(storage_.s[start.get!long..end.get!long]);
+			return Value(storage_.s[start.get!size_t..end.get!size_t]);
 		case Array:
-			return Value(storage_.a[start.get!long..end.get!long]);
+			return Value(storage_.a[start.get!size_t..end.get!size_t]);
 		}
 	}
 
@@ -629,11 +629,11 @@ struct Value {
 			throw new Exception(format("indexing not allowed for type %s", type));
 		case String:
 		case Array:
-			return Value(index.get!long);
+			return Value(index.get!size_t);
 		case AssocArray:
-			return Value(storage_.aa.keys()[index.get!long]);
+			return Value(storage_.aa.keys()[index.get!size_t]);
 		case Object:
-			return Value(storage_.o.keys()[index.get!long]);
+			return Value(storage_.o.keys()[index.get!size_t]);
 		}
 	}
 
