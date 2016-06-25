@@ -1,4 +1,4 @@
-### Vayne - Mustache-inspired template compiler and run-time interpreter for D
+### Vayne - Mustache-inspired template compiler and interpreter for D
 
 Vayne has been written mainly for use with vibe.d but it can be used in any other way.
 It is the successor to jax, a compile-time solution.
