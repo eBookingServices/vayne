@@ -32,7 +32,7 @@ Compiles source text/html into bytecode to be interpreted at run time.
 	{{@ expr0, expr2 as ident }} - Create symbol scopes or named copy of expressions. For symbol scopes, expression must evalute to an object or associative array.
 	{{! comment }} - Comment
 	{{ expr }} - Write expression to output with automatic HTML escaping
-    	{{{ expr }}} - Write expression to output without escaping
+	{{{ expr }}} - Write expression to output without escaping
 	{{~ message-id-expr, arg0+ }} - Translate message-id with arguments and output - use triple brackets to disable escaping
 	{{#def myMacro(arg) }} macro text {{#arg}} {{#/}}
 	{{#myMacro("mooo") }} - Expand a macro
