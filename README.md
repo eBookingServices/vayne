@@ -21,7 +21,6 @@ Compiles source text/html into bytecode to be interpreted at run time.
 	g|dep-gen-only - Only generate dependant-cache, do not re-compile dependants
 	c|compress - Compress HTML in between template tags
 	j|search - Search path(s) to look for dependency files
-	t|token	- Token for token_url interpolation filter. Useful for cache-busting
 
 
 #### Tags
