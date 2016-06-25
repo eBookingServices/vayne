@@ -735,7 +735,7 @@ private struct ExprParser {
 			return (name.length == 2) ? Logic : 0;
 		default:
 			if ((name.length == 2) && (name == "in"))
-				return 0/*Bitwise*/;
+				return Algebraic/*Bitwise*/;
 			break;
 		}
 		return 0;
