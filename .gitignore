@@ -5,6 +5,7 @@ __dummy.html
 *.a
 *.o
 *.obj
+*.exe
 vayne
 !vayne/
 *.vayne
