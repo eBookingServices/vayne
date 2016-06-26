@@ -23,6 +23,9 @@ void render(OutputStreamT, string FileName, Vars...)(OutputStreamT o__, string l
 
 	foreach(i, c; compiled.constants) {
 		final switch (c.type) with (ConstantType) {
+		case Null:
+			constants ~= Value(null);
+			break;
 		case Boolean:
 			constants ~= Value(c.value.to!bool);
 			break;

@@ -34,6 +34,7 @@ struct CompilerOptions {
 
 
 enum ConstantType : ubyte {
+	Null,
 	Boolean,
 	String,
 	Integer,
@@ -128,6 +129,9 @@ CompiledCode compile(string fileName, CompilerOptions options) {
 			constants.reserve(emitter.constants.length);
 			foreach (i, k; emitter.constants) {
 				final switch (k.type) with (Emitter.ConstantSlot.Type) {
+				case Null:
+					constants ~= CompiledCode.Constant(ConstantType.Null, k.value);
+					break;
 				case Boolean:
 					constants ~= CompiledCode.Constant(ConstantType.Boolean, k.value);
 					break;

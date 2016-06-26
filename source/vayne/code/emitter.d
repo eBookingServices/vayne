@@ -48,6 +48,7 @@ struct Emitter {
 
 	static struct ConstantSlot {
 		enum Type : ubyte {
+			Null,
 			Boolean,
 			String,
 			Integer,
@@ -136,6 +137,7 @@ private:
 			case False:
 				return constant(ConstantSlot.Type.Boolean, "false");
 			case Null:
+				return constant(ConstantSlot.Type.Null, "null");
 			case In:
 			case Def:
 			case Undef:

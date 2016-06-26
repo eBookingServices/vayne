@@ -550,6 +550,8 @@ private struct ExprParser {
 				return create!Constant(eat());
 			case False:
 				return create!Constant(eat());
+			case Null:
+				return create!Constant(eat());
 			default:
 				throw new ExprParserException(tok_, format("unexpected '%s'", tok_));
 			}
