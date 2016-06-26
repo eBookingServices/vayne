@@ -218,78 +218,84 @@ private:
 	auto emitBinaryOp(BinaryOp node) {
 		debug mixin(Guard);
 
-		auto lhs = emitExpression(node.children[0]);
-		auto rhs = emitExpression(node.children[1]);
-		scope (exit) release(lhs, rhs);
+		{
+			switch (node.tok.name) {
+			case "&&":
+			case "||":
+				auto target = register();
+				auto lhs = emitExpression(node.children[0]);
+				emit(OpCode.Test, node.tok.loc, target, lhs);
+				release(lhs);
 
-		auto target = register();
+				size_t jumpShortCircuit = placeholder(node.tok.loc);
 
-		switch (node.tok.name) {
-		case "&&":
-			lhs = registerize(node.children[0].tok.loc, lhs);
-			emit(OpCode.Test, node.children[0].tok.loc, lhs, lhs);
+				auto rhs = emitExpression(node.children[1]);
+				emit(OpCode.Test, node.tok.loc, target, rhs);
+				release(rhs);
 
-			rhs = registerize(node.children[1].tok.loc, rhs);
-			emit(OpCode.Test, node.children[1].tok.loc, rhs, rhs);
-
-			emit(OpCode.And, node.tok.loc, target, lhs, rhs);
-			break;
-		case "||":
-			lhs = registerize(node.children[0].tok.loc, lhs);
-			emit(OpCode.Test, node.children[0].tok.loc, lhs, lhs);
-
-			rhs = registerize(node.children[1].tok.loc, rhs);
-			emit(OpCode.Test, node.children[1].tok.loc, rhs, rhs);
-
-			emit(OpCode.Or, node.tok.loc, target, lhs, rhs);
-			break;
-		case "==":
-			emit(OpCode.Equal, node.tok.loc, target, lhs, rhs);
-			break;
-		case "!=":
-			emit(OpCode.NotEqual, node.tok.loc, target, lhs, rhs);
-			break;
-		case ">":
-			emit(OpCode.Greater, node.tok.loc, target, lhs, rhs);
-			break;
-		case ">=":
-			emit(OpCode.GreaterOrEqual, node.tok.loc, target, lhs, rhs);
-			break;
-		case "<":
-			emit(OpCode.Less, node.tok.loc, target, lhs, rhs);
-			break;
-		case "<=":
-			emit(OpCode.LessOrEqual, node.tok.loc, target, lhs, rhs);
-			break;
-		case "+":
-			emit(OpCode.Add, node.tok.loc, target, lhs, rhs);
-			break;
-		case "-":
-			emit(OpCode.Subtract, node.tok.loc, target, lhs, rhs);
-			break;
-		case "*":
-			emit(OpCode.Multiply, node.tok.loc, target, lhs, rhs);
-			break;
-		case "/":
-			emit(OpCode.Divide, node.tok.loc, target, lhs, rhs);
-			break;
-		case "%":
-			emit(OpCode.Remainder, node.tok.loc, target, lhs, rhs);
-			break;
-		case "~":
-			emit(OpCode.Concat, node.tok.loc, target, lhs, rhs);
-			break;
-		case "^^":
-			emit(OpCode.Power, node.tok.loc, target, lhs, rhs);
-			break;
-		case "in":
-			emit(OpCode.TestKey, node.tok.loc, target, rhs, lhs);
-			break;
-		default:
-			assert(false, "unimplemented binary op " ~ node.tok.toString);
+				emitAt((node.tok.name == "&&") ? OpCode.JumpIfZero : OpCode.JumpIfNotZero, node.tok.loc, jumpShortCircuit, Value(Value.Kind.Immediate, ip), target);
+				return target;
+			default:
+				break;
+			}
 		}
 
-		return target;
+		{
+			auto lhs = emitExpression(node.children[0]);
+			auto rhs = emitExpression(node.children[1]);
+			scope (exit) release(lhs, rhs);
+
+			auto target = register();
+
+			switch (node.tok.name) {
+			case "==":
+				emit(OpCode.Equal, node.tok.loc, target, lhs, rhs);
+				break;
+			case "!=":
+				emit(OpCode.NotEqual, node.tok.loc, target, lhs, rhs);
+				break;
+			case ">":
+				emit(OpCode.Greater, node.tok.loc, target, lhs, rhs);
+				break;
+			case ">=":
+				emit(OpCode.GreaterOrEqual, node.tok.loc, target, lhs, rhs);
+				break;
+			case "<":
+				emit(OpCode.Less, node.tok.loc, target, lhs, rhs);
+				break;
+			case "<=":
+				emit(OpCode.LessOrEqual, node.tok.loc, target, lhs, rhs);
+				break;
+			case "+":
+				emit(OpCode.Add, node.tok.loc, target, lhs, rhs);
+				break;
+			case "-":
+				emit(OpCode.Subtract, node.tok.loc, target, lhs, rhs);
+				break;
+			case "*":
+				emit(OpCode.Multiply, node.tok.loc, target, lhs, rhs);
+				break;
+			case "/":
+				emit(OpCode.Divide, node.tok.loc, target, lhs, rhs);
+				break;
+			case "%":
+				emit(OpCode.Remainder, node.tok.loc, target, lhs, rhs);
+				break;
+			case "~":
+				emit(OpCode.Concat, node.tok.loc, target, lhs, rhs);
+				break;
+			case "^^":
+				emit(OpCode.Power, node.tok.loc, target, lhs, rhs);
+				break;
+			case "in":
+				emit(OpCode.TestKey, node.tok.loc, target, rhs, lhs);
+				break;
+			default:
+				assert(false, "unimplemented binary op " ~ node.tok.toString);
+			}
+
+			return target;
+		}
 	}
 
 	auto emitConditionalExpression(ConditionalExpression node) {
@@ -495,13 +501,10 @@ private:
 		debug mixin(Guard);
 
 		auto expr = emitExpression(node.children[0]);
-		auto test = (instrs_.empty || !instrs_.back.isBoolean);
-		auto cond = test ? register() : expr;
+		auto cond = register();
 
-		if (test) {
-			emit(OpCode.Test, node.tok.loc, cond, expr);
-			release(expr);
-		}
+		emit(OpCode.Test, node.tok.loc, cond, expr);
+		release(expr);
 
 		size_t jumpTrueCase = placeholder(node.tok.loc);
 		release(cond);
