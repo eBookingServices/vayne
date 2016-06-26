@@ -704,11 +704,12 @@ private struct ExprParser {
 		return null;
 	}
 
-	enum OperatorPriority {
-		Logic       = 10,
-		Arithmetic  = 20,
-		Algebraic   = 30,
-		Bitwise     = 40,
+	enum OperatorPriority : size_t {
+		Logic		= 10,
+		Compare		= 20,
+		Arithmetic	= 30,
+		Algebraic	= 40,
+		Bitwise		= 50,
 	}
 
 	size_t isBinaryOp(string name) const {
@@ -718,7 +719,7 @@ private struct ExprParser {
 			return (name.length == 1) ? 0/*Bitwise*/ : Logic;
 		case '>':   // >, >=, >>, >>=
 		case '<':   // <, <=, <<, <<=
-			return ((name.length == 1) || (name[1] == '=')) ? Logic : 0/*Bitwise*/;
+			return ((name.length == 1) || (name[1] == '=')) ? Compare : 0/*Bitwise*/;
 		case '^':   // ^, ^=, ^^, ^^=
 			return ((name.length == 1) || (name[1] == '=')) ? 0/*Bitwise*/ : Algebraic;
 		case '+':
@@ -730,12 +731,12 @@ private struct ExprParser {
 		case '%':
 			return (name.length == 1) ? Algebraic : 0;
 		case '=':
-			return (name.length == 2) ? Logic : 0;
+			return (name.length == 2) ? Compare : 0;
 		case '!':
-			return (name.length == 2) ? Logic : 0;
+			return (name.length == 2) ? Compare : 0;
 		default:
 			if ((name.length == 2) && (name == "in"))
-				return Algebraic/*Bitwise*/;
+				return Compare/*Bitwise*/;
 			break;
 		}
 		return 0;
