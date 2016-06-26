@@ -56,8 +56,21 @@ void bindLibBasic(ref Value[string] globals) {
 		return x.get!bool;
 	}
 
-	static string escape(Value x) {
-		return escapeHTML(x.get!string);
+	static string escape(Value[] x) {
+		auto value = x[0].get!string;
+
+		foreach (f; x[1..$]) {
+			switch (f.get!string) {
+			case "html":
+				value = escapeHTML(value);
+				break;
+			default:
+				assert("unimplemented escape filter: " ~ f.get!string);
+				break;
+			}
+		}
+
+		return value;
 	}
 
 	static string translate(Value[] x) {
@@ -75,17 +88,20 @@ void bindLibBasic(ref Value[string] globals) {
 
 	globals["default"] = Value(&def);
 
+	globals["escape"] = Value(&escape);
+
 	globals["__escape"] = Value(&escape);
 	globals["__translate"] = Value(&translate);
 }
 
 
 void bindLibString(ref Value[string] globals) {
-	static string join(Value x, Value sep) {
+	static string join(Value[] x) {
 		auto app = appender!string;
-		auto len = x.length;
-		auto seps = sep.get!string;
-		foreach (size_t i, v; x) {
+		auto value = x[0];
+		auto len = value.length;
+		auto seps = (x.length > 1) ? x[1].get!string : ",";
+		foreach (size_t i, v; value) {
 			app.put(v.get!string);
 			if (i + 1 != len)
 				app.put(seps);
@@ -93,8 +109,11 @@ void bindLibString(ref Value[string] globals) {
 		return app.data;
 	}
 
-	static string[] split(Value x, Value sep) {
-		return x.get!string.splitter(sep.get!string).array;
+	static string[] split(Value[] x) {
+		auto value = x[0].get!string;
+		auto sep = (x.length > 1) ? x[1].get!string : " ";
+
+		return value.split(sep);
 	}
 
 	static string strip(Value x) {

@@ -250,7 +250,7 @@ struct VM(uint options = VMOptions.Default) {
 					regs_[instr.arg!0] = getArgV!1.key(getArgV!2);
 					break;
 				case Slice:
-					regs_[instr.arg!0] = getArgV!1.slice(getArgV!2, getArgV!3);
+					regs_[instr.arg!0] = getArgV!1[getArgV!2..getArgV!3];
 					break;
 				case Dispatch:
 					assert(!dispatchArg_);
@@ -279,10 +279,10 @@ struct VM(uint options = VMOptions.Default) {
 						}
 					}
 
-					*pout = getArgV!1.get(name);
+					*pout = getArgV!1[name];
 					break;
 				case Element:
-					regs_[instr.arg!0] = getArgV!1.get(getArgV!2);
+					regs_[instr.arg!0] = getArgV!1[getArgV!2];
 					break;
 				case LookUp:
 					auto name = getArgV!1;

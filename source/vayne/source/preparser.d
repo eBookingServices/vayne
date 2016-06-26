@@ -60,7 +60,7 @@ private:
 			} else if (auto preError = cast(PreParserException)error) {
 				errors = format("%s: %s", mgr_.loc(preError.loc), error.msg);
 			} else {
-				errors = error.msg;
+				errors = format("%s: %s", mgr_.loc(contexts_.back.loc), error.msg);
 			}
 
 			if (!contexts_.empty) {

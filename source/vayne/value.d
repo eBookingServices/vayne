@@ -180,18 +180,16 @@ struct Value {
 	private void bindMembers(T)(auto ref T x) {
 		foreach (Member; FieldNameTuple!T) {
 			static if ((Member != "") && (__traits(getProtection, __traits(getMember, x, Member)) == "public")) {
-				enum isMemberVariable = is(typeof(() { __traits(getMember, x, Member) = __traits(getMember, x, Member).init; }));
-				static if (isMemberVariable) {
-					storage_.o[Member] = Value(__traits(getMember, x, Member));
-				}
+				storage_.o[Member] = Value(__traits(getMember, x, Member));
 			}
 		}
 
-		enum NotCallableNames = ["__ctor", "opAssign", "opIndexAssign", "opCast"];
+		enum NotCallableNames = ["__ctor", "__xdtor", "__postblit", "__xpostblit", "opAssign", "opIndexAssign", "opCast", "opDollar", "opIndex", "opSlice", "opApply", "opCmp"];
 		enum NotBindableNames = ["opIndex"];
 
 		foreach (Member; __traits(derivedMembers, T)) {
 			enum callable = !NotCallableNames.canFind(Member);
+
 			static if (callable && is(typeof(&__traits(getMember, x, Member)) == delegate) && isCompatibleFunction!(typeof(&__traits(getMember, x, Member)))) {
 				enum bindable = !NotBindableNames.canFind(Member);
 
@@ -565,7 +563,7 @@ struct Value {
 		}
 	}
 
-	ref auto get(in Value index) const {
+	Value opIndex(in Value index) const {
 		final switch (type) with (Type) {
 		case Null:
 		case Undefined:
@@ -598,7 +596,112 @@ struct Value {
 		}
 	}
 
-	ref auto slice(in Value start, in Value end) const {
+	Value opIndex(in string index) const {
+		final switch (type) with (Type) {
+		case Null:
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("indexing not allowed for type %s", type));
+		case String:
+			throw new Exception(format("indexing with string key not allowed for type %s", type));
+		case Array:
+			throw new Exception(format("indexing with string key not allowed for type %s", type));
+		case AssocArray:
+			auto i = Value(index);
+			if (auto pvalue = i in storage_.aa)
+				return *pvalue;
+			throw new Exception(format("undefined key '%s' for associative array", i));
+		case Object:
+			if (auto pvalue = index in storage_.o)
+				return *pvalue;
+			throw new Exception(format("unknown member '%s' for object", index));
+		}
+	}
+
+	Value opIndex(in size_t index) const {
+		final switch (type) with (Type) {
+		case Null:
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("indexing not allowed for type %s", type));
+		case Object:
+			throw new Exception(format("indexing with integer key not allowed for type %s", type));
+		case String:
+			if (auto i = index < length)
+				return Value(storage_.s[index..index + 1]);
+			throw new Exception("out of range");
+		case Array:
+			if (index < length)
+				return (cast(Value*)storage_.a)[index];
+			throw new Exception("out of range");
+		case AssocArray:
+			if (auto pvalue = Value(index) in storage_.aa)
+				return *pvalue;
+			throw new Exception(format("undefined key '%s' for associative array", index));
+		}
+	}
+
+	void opIndexAssign(Value value, in string index) {
+		final switch (type) with (Type) {
+		case Null:
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("index assign not allowed for type %s", type));
+		case String:
+			throw new Exception(format("index assign with string key not allowed for type %s", type));
+		case Array:
+			throw new Exception(format("index assign with string key not allowed for type %s", type));
+		case AssocArray:
+			storage_.aa[Value(index)] = value;
+			break;
+		case Object:
+			storage_.o[index] = value;
+			break;
+		}
+	}
+
+	void opIndexAssign(Value value, in size_t index) {
+		final switch (type) with (Type) {
+		case Null:
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case String:
+		case Pointer:
+			throw new Exception(format("index assign not allowed for type %s", type));
+		case Object:
+			throw new Exception(format("index assign with integer key not allowed for type %s", type));
+		case Array:
+			if (index < length) {
+				storage_.a[index] = value;
+				break;
+			}
+			throw new Exception("out of range");
+		case AssocArray:
+			storage_.aa[Value(index)] = value;
+			break;
+		}
+	}
+
+	Value opSlice(in Value start, in Value end) const {
+		return opSlice(start.get!size_t, end.get!size_t);
+	}
+
+	Value opSlice(in size_t start, in size_t end) const {
 		final switch (type) with (Type) {
 		case Null:
 		case Undefined:
@@ -611,13 +714,13 @@ struct Value {
 		case Object:
 			throw new Exception(format("slicing not allowed for type %s", type));
 		case String:
-			return Value(storage_.s[start.get!size_t..end.get!size_t]);
+			return Value(storage_.s[start..end]);
 		case Array:
-			return Value(storage_.a[start.get!size_t..end.get!size_t]);
+			return Value(storage_.a[start..end]);
 		}
 	}
 
-	ref auto key(in Value index) const {
+	Value key(in Value index) const {
 		final switch (type) with (Type) {
 		case Null:
 		case Undefined:
@@ -780,6 +883,18 @@ struct Value {
 			break;
 		}
 		return 0;
+	}
+
+	static auto emptyObject() {
+		Value value;
+		value.type_ = Type.Object;
+		return value;
+	}
+
+	static auto emptyAssocArray() {
+		Value value;
+		value.type_ = Type.AssocArray;
+		return value;
 	}
 
 	void call(ref Value ret, Value[] args) const {

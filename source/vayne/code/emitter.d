@@ -226,9 +226,21 @@ private:
 
 		switch (node.tok.name) {
 		case "&&":
+			lhs = registerize(node.children[0].tok.loc, lhs);
+			emit(OpCode.Test, node.children[0].tok.loc, lhs, lhs);
+
+			rhs = registerize(node.children[1].tok.loc, rhs);
+			emit(OpCode.Test, node.children[1].tok.loc, rhs, rhs);
+
 			emit(OpCode.And, node.tok.loc, target, lhs, rhs);
 			break;
 		case "||":
+			lhs = registerize(node.children[0].tok.loc, lhs);
+			emit(OpCode.Test, node.children[0].tok.loc, lhs, lhs);
+
+			rhs = registerize(node.children[1].tok.loc, rhs);
+			emit(OpCode.Test, node.children[1].tok.loc, rhs, rhs);
+
 			emit(OpCode.Or, node.tok.loc, target, lhs, rhs);
 			break;
 		case "==":
