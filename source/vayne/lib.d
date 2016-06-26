@@ -34,8 +34,15 @@ void bindLibBasic(ref Value[string] globals) {
 		return x.keys();
 	}
 
+	static Value get(Value x, Value key, Value def) {
+		Value result;
+		if (x.has(key, &result))
+			return result;
+		return def;
+	}
+
 	static Value def(Value x, Value def) {
-		if (x.type == Value.Type.Undefined)
+		if ((x.type == Value.Type.Undefined) || (x.type == Value.Type.Null))
 			return def;
 		return x;
 	}
@@ -56,13 +63,19 @@ void bindLibBasic(ref Value[string] globals) {
 		return x.get!bool;
 	}
 
-	static string escape(Value[] x) {
-		auto value = x[0].get!string;
+	static string escape(Value[] args) {
+		auto value = args[0].get!string;
 
-		foreach (f; x[1..$]) {
+		foreach (f; args[1..$]) {
 			switch (f.get!string) {
 			case "html":
 				value = escapeHTML(value);
+				break;
+			case "js":
+				value = escapeJS(value);
+				break;
+			case "uri":
+				value = escapeURI(value);
 				break;
 			default:
 				assert("unimplemented escape filter: " ~ f.get!string);
@@ -73,8 +86,8 @@ void bindLibBasic(ref Value[string] globals) {
 		return value;
 	}
 
-	static string translate(Value[] x) {
-		return x[0].get!string;
+	static string translate(Value[] args) {
+		return args[0].get!string;
 	}
 
 	globals["length"] = Value(&length);
@@ -86,6 +99,7 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["string"] = Value(&tostring);
 	globals["bool"] = Value(&tobool);
 
+	globals["get"] = Value(&get);
 	globals["default"] = Value(&def);
 
 	globals["escape"] = Value(&escape);
@@ -128,11 +142,11 @@ void bindLibString(ref Value[string] globals) {
 		return haystack.indexOf(needle, start);
 	}
 
-	static string toLower(Value x) {
+	static string lower(Value x) {
 		return x.get!string.toLower();
 	}
 
-	static string toUpper(Value x) {
+	static string upper(Value x) {
 		return x.get!string.toUpper();
 	}
 
@@ -140,10 +154,8 @@ void bindLibString(ref Value[string] globals) {
 	globals["split"] = Value(&split);
 	globals["strip"] = Value(&strip);
 	globals["indexOf"] = Value(&indexOf);
-	globals["toLower"] = Value(&toLower);
-	globals["toUpper"] = Value(&toUpper);
-
-	globals["escapeHTML"] = Value(&escapeHTML);
+	globals["lower"] = Value(&lower);
+	globals["upper"] = Value(&upper);
 }
 
 
@@ -153,7 +165,7 @@ void bindLibDefault(ref Value[string] globals) {
 }
 
 
-static string escapeHTML(string x) {
+string escapeHTML(string x) {
 	auto app = appender!string;
 	app.reserve(8 + x.length + (x.length >> 1));
 
@@ -186,9 +198,60 @@ static string escapeHTML(string x) {
 			app.put("&amp;");
 			break;
 		default:
-			formattedWrite(&app, "&#%d;", cast(uint)ch);
+			formattedWrite(&app, "&#x%02X;", cast(uint)ch);
 			break;
 		}
 	}
+	return app.data;
+}
+
+
+string escapeJS(string x) {
+	auto app = appender!string;
+	app.reserve(x.length + (x.length >> 1));
+
+	foreach (ch; x.byDchar) {
+		switch (ch) {
+			case '\\':
+				app.put(`\\`);
+				break;
+			case '\'':
+				app.put(`\'`);
+				break;
+			case '\"':
+				app.put(`\"`);
+				break;
+			case '\r':
+				break;
+			case '\n':
+				app.put(`\n`);
+				break;
+			default:
+				app.put(ch);
+				break;
+		}
+	}
+	return app.data;
+}
+
+
+string escapeURI(string x) {
+	auto app = appender!string;
+	app.reserve(8 + x.length + (x.length >> 1));
+
+	foreach (i; 0..x.length) {
+		switch (x.ptr[i]) {
+		case 'A': .. case 'Z':
+		case 'a': .. case 'z':
+		case '0': .. case '9':
+		case '-': case '_': case '.': case '~':
+			app.put(x.ptr[i]);
+			break;
+		default:
+			formattedWrite(&app, "%%%02X", x.ptr[i]);
+			break;
+		}
+	}
+
 	return app.data;
 }
