@@ -12,6 +12,20 @@ import std.traits;
 import std.stdio;
 
 
+private struct IgnoreAttribute {}
+private struct NameAttribute { const(char)[] name; }
+
+
+@property IgnoreAttribute ignore() {
+	return IgnoreAttribute();
+}
+
+
+@property NameAttribute bind(const(char)[] name)  {
+	return NameAttribute(name);
+}
+
+
 private enum NotCallableNames = ["__ctor", "__xdtor", "__postblit", "__xpostblit", "opAssign", "opIndexAssign", "opCast", "opDollar", "opIndex", "opSlice", "opApply", "opCmp"];
 private enum NotBindableNames = ["opIndex"];
 
@@ -67,10 +81,11 @@ private static void functionWrapper(T)(void* ptr, void* self, Value[] args, ref 
 		Args argValues;
 
 		foreach (i, Arg; Args) {
+			alias ArgU = Unqual!Arg;
 			static if (is(Arg == enum)) {
-				*cast(Arg*)&argValues[i] = cast(Arg)args[i].get!(Unqual!(OriginalType!Arg));
+				*cast(ArgU*)&argValues[i] = cast(ArgU)args[i].get!(Unqual!(OriginalType!ArgU));
 			} else {
-				*cast(Arg*)&argValues[i] = args[i].get!(Unqual!Arg);
+				*cast(ArgU*)&argValues[i] = args[i].get!ArgU;
 			}
 		}
 	}
@@ -175,14 +190,22 @@ struct Value {
 
 	// struct have to be bound by ref because methods/delegates might otherwise point to garbage memory
 	this(T)(ref T x) if (is(Unqual!T == struct)) {
-		type_ = Type.Object;
-		bindMembers(x);
+		static if (is(Unqual!(typeof(x.toVayneValue())) == Value)) {
+			this = x.toVayneValue();
+		} else {
+			type_ = Type.Object;
+			bindMembers(x);
+		}
 	}
 
 	this(T)(T x) if (is(Unqual!T == class) || is(Unqual!T == interface)) {
 		if (x !is null) {
-			type_ = Type.Object;
-			bindMembers(x);
+			static if (is(Unqual!(typeof(x.toVayneValue())) == Value)) {
+				this = x.toVayneValue();
+			} else {
+				type_ = Type.Object;
+				bindMembers(x);
+			}
 		} else {
 			type_ = Type.Null;
 		}
@@ -190,12 +213,18 @@ struct Value {
 
 	private void bindMembers(T)(auto ref T x) {
 		foreach (Member; FieldNameTuple!T) {
-			static if ((Member != "") && (__traits(getProtection, __traits(getMember, x, Member)) == "public")) {
+			static if ((Member != "") && (__traits(getProtection, __traits(getMember, x, Member)) == "public") && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
+				static if (hasUDA!(__traits(getMember, x, Member), NameAttribute)) {
+					enum name = getUDAs!(__traits(getMember, x, Member), NameAttribute)[0].name;
+				} else {
+					enum name = Member;
+				}
+
 				static if (!isSomeFunction!(typeof(__traits(getMember, x, Member)))) {
-					storage_.o[Member] = Value(__traits(getMember, x, Member));
+					storage_.o[name] = Value(__traits(getMember, x, Member));
 				} else static if (isCompatibleFunction!(typeof(__traits(getMember, x, Member)))) {
 					if (__traits(getMember, x, Member) is !null) {
-						storage_.o[Member] = Value(__traits(getMember, x, Member));
+						storage_.o[name] = Value(__traits(getMember, x, Member));
 					}
 				}
 			}
@@ -204,19 +233,27 @@ struct Value {
 		foreach (Member; __traits(derivedMembers, T)) {
 			enum callable = !NotCallableNames.canFind(Member);
 
-			static if (callable && is(typeof(&__traits(getMember, x, Member)) == delegate) && isCompatibleFunction!(typeof(&__traits(getMember, x, Member)))) {
-				enum bindable = !NotBindableNames.canFind(Member);
+			static if (is(typeof(__traits(getMember, T, Member))) && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
+				static if (callable && is(typeof(&__traits(getMember, x, Member)) == delegate) && isCompatibleFunction!(typeof(&__traits(getMember, x, Member)))) {
+					enum bindable = !NotBindableNames.canFind(Member);
 
-				alias Args = ParameterTypeTuple!(typeof(&__traits(getMember, x, Member)));
+					alias Args = ParameterTypeTuple!(typeof(&__traits(getMember, x, Member)));
 
-				static if (bindable) {
-					storage_.o[Member] = Value(&__traits(getMember, x, Member));
-				}
+					static if (hasUDA!(__traits(getMember, x, Member), NameAttribute)) {
+						enum name = getUDAs!(__traits(getMember, x, Member), NameAttribute)[0].name;
+					} else {
+						enum name = Member;
+					}
 
-				static if ((Member == "toString") && (Args.length == 0)) {
-					storage_.o["__tostring"] = Value(&__traits(getMember, x, Member));
-				} else static if ((Member == "opIndex")) {
-					//storage_.o["__index"] = Value(&__traits(getMember, x, Member));
+					static if (bindable) {
+						storage_.o[name] = Value(&__traits(getMember, x, Member));
+					}
+
+					static if ((Member == "toString") && (Args.length == 0)) {
+						storage_.o["__tostring"] = Value(&__traits(getMember, x, Member));
+					} else static if ((Member == "opIndex")) {
+						//storage_.o["__index"] = Value(&__traits(getMember, x, Member));
+					}
 				}
 			}
 		}
