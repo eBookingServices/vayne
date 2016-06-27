@@ -68,9 +68,9 @@ private static void functionWrapper(T)(void* ptr, void* self, Value[] args, ref 
 
 		foreach (i, Arg; Args) {
 			static if (is(Arg == enum)) {
-				argValues[i] = cast(Arg)args[i].get!(OriginalType!Arg);
+				*cast(Arg*)&argValues[i] = cast(Arg)args[i].get!(Unqual!(OriginalType!Arg));
 			} else {
-				argValues[i] = args[i].get!Arg;
+				*cast(Arg*)&argValues[i] = args[i].get!(Unqual!Arg);
 			}
 		}
 	}
