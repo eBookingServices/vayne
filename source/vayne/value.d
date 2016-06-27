@@ -12,19 +12,23 @@ import std.traits;
 import std.stdio;
 
 
+private enum NotCallableNames = ["__ctor", "__xdtor", "__postblit", "__xpostblit", "opAssign", "opIndexAssign", "opCast", "opDollar", "opIndex", "opSlice", "opApply", "opCmp"];
+private enum NotBindableNames = ["opIndex"];
+
+
 private template isCompatibleStorageClass(size_t Class) {
 	enum isCompatibleStorageClass = Class == 0;
 }
 
 
 private template isCompatibleArgType(T) {
-	enum isCompatibleArgType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || (isArray!T && is(Unqual!(typeof(T.init[0])) == Value)));
+	enum isCompatibleArgType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || (isArray!T && is(Unqual!(typeof(T.init[0])) == Value)) || (isAssociativeArray!T && is(Unqual!(KeyType!T) == Value) && is(Unqual!(ValueType!T) == Value)));
 }
 
 
 private template isCompatibleReturnType(F) {
 	alias R = ReturnType!F;
-	enum isCompatibleReturnType = !isSomeFunction!R && (isScalarType!R || isSomeString!R || isBoolean!R || is(Unqual!R == Value) || isArray!R || is(R == class) || is(R == interface) || (is(R == struct) && ((functionAttributes!F & FunctionAttribute.ref_) != 0)));
+	enum isCompatibleReturnType = !isSomeFunction!R && (isScalarType!R || isSomeString!R || isBoolean!R || is(Unqual!R == Value) || isArray!R  || isAssociativeArray!R || is(R == class) || is(R == interface) || (is(R == struct) && ((functionAttributes!F & FunctionAttribute.ref_) != 0)));
 }
 
 
@@ -169,6 +173,7 @@ struct Value {
 		}
 	}
 
+	// struct have to be bound by ref because methods/delegates might otherwise point to garbage memory
 	this(T)(ref T x) if (is(Unqual!T == struct)) {
 		type_ = Type.Object;
 		bindMembers(x);
@@ -195,9 +200,6 @@ struct Value {
 				}
 			}
 		}
-
-		enum NotCallableNames = ["__ctor", "__xdtor", "__postblit", "__xpostblit", "opAssign", "opIndexAssign", "opCast", "opDollar", "opIndex", "opSlice", "opApply", "opCmp"];
-		enum NotBindableNames = ["opIndex"];
 
 		foreach (Member; __traits(derivedMembers, T)) {
 			enum callable = !NotCallableNames.canFind(Member);
