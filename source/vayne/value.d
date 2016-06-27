@@ -169,7 +169,7 @@ struct Value {
 		}
 	}
 
-	this(T)(auto ref T x) if (is(Unqual!T == struct)) {
+	this(T)(ref T x) if (is(Unqual!T == struct)) {
 		type_ = Type.Object;
 		bindMembers(x);
 	}
