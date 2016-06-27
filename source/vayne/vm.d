@@ -104,7 +104,7 @@ struct VM(uint options = VMOptions.Default) {
 
 	void execute(T)(ref T output) if (isWriterObject!T) {
 		Instr instr = instrs_[0];
-		ulong ip;
+		size_t ip;
 
 		ref auto getArgV(size_t Arg)() if (Arg <= 3) {
 			if (instr.argConst!Arg) {

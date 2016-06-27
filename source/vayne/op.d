@@ -250,7 +250,7 @@ struct Instr {
 		return cast(OpCode)(code0 & OpMask);
 	}
 
-	auto arg(size_t Arg)() const {
+	size_t arg(size_t Arg)() const {
 		static if (Arg == 0) {
 			return (code0 >> Arg0Shift) & ArgMask;
 		} else static if (Arg == 1) {
@@ -262,7 +262,7 @@ struct Instr {
 		}
 	}
 
-	auto argConst(size_t Arg)() const {
+	bool argConst(size_t Arg)() const {
 		static if (Arg == 0) {
 			return (code0 & Arg0ConstMask) != 0;
 		} else static if (Arg == 1) {
@@ -274,7 +274,7 @@ struct Instr {
 		}
 	}
 
-	auto argName(size_t Arg)() const {
+	string argName(size_t Arg)() const {
 		return format("%s%s", (argConst!Arg ? "c" : "r"), arg!Arg);
 	}
 

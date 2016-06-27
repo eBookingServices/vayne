@@ -23,7 +23,7 @@ private template isCompatibleArgType(T) {
 
 
 private template isCompatibleReturnType(T) {
-	enum isCompatibleReturnType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || isArray!T);
+	enum isCompatibleReturnType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || isArray!T || is(T == struct) || is(T == class) || is(T == interface));
 }
 
 
