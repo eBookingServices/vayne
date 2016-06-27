@@ -22,13 +22,14 @@ private template isCompatibleArgType(T) {
 }
 
 
-private template isCompatibleReturnType(T) {
-	enum isCompatibleReturnType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || isArray!T || is(T == struct) || is(T == class) || is(T == interface));
+private template isCompatibleReturnType(F) {
+	alias R = ReturnType!F;
+	enum isCompatibleReturnType = !isSomeFunction!R && (isScalarType!R || isSomeString!R || isBoolean!R || is(Unqual!R == Value) || isArray!R || is(R == class) || is(R == interface) || (is(R == struct) && ((functionAttributes!F & FunctionAttribute.ref_) != 0)));
 }
 
 
 private template isCompatibleFunction(T) {
-	enum isCompatibleFunction = isCompatibleReturnType!(ReturnType!T) && allSatisfy!(isCompatibleArgType, ParameterTypeTuple!T) && allSatisfy!(isCompatibleStorageClass, ParameterStorageClassTuple!T);
+	enum isCompatibleFunction = isCompatibleReturnType!T && allSatisfy!(isCompatibleArgType, ParameterTypeTuple!T) && allSatisfy!(isCompatibleStorageClass, ParameterStorageClassTuple!T);
 }
 
 
@@ -61,8 +62,13 @@ private static void functionWrapper(T)(void* ptr, void* self, Value[] args, ref 
 
 		Args argValues;
 
-		foreach (i, Arg; Args)
-			argValues[i] = args[i].get!Arg;
+		foreach (i, Arg; Args) {
+			static if (is(Arg == enum)) {
+				argValues[i] = cast(Arg)args[i].get!(OriginalType!Arg);
+			} else {
+				argValues[i] = args[i].get!Arg;
+			}
+		}
 	}
 
 	static if (is(ReturnType!T == void)) {
@@ -163,7 +169,7 @@ struct Value {
 		}
 	}
 
-	this(T)(ref T x) if (is(Unqual!T == struct)) {
+	this(T)(auto ref T x) if (is(Unqual!T == struct)) {
 		type_ = Type.Object;
 		bindMembers(x);
 	}
@@ -180,7 +186,13 @@ struct Value {
 	private void bindMembers(T)(auto ref T x) {
 		foreach (Member; FieldNameTuple!T) {
 			static if ((Member != "") && (__traits(getProtection, __traits(getMember, x, Member)) == "public")) {
-				storage_.o[Member] = Value(__traits(getMember, x, Member));
+				static if (!isSomeFunction!(typeof(__traits(getMember, x, Member)))) {
+					storage_.o[Member] = Value(__traits(getMember, x, Member));
+				} else static if (isCompatibleFunction!(typeof(__traits(getMember, x, Member)))) {
+					if (__traits(getMember, x, Member) is !null) {
+						storage_.o[Member] = Value(__traits(getMember, x, Member));
+					}
+				}
 			}
 		}
 

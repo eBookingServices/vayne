@@ -34,6 +34,14 @@ void bindLibBasic(ref Value[string] globals) {
 		return x.keys();
 	}
 
+	static Value front(Value x) {
+		return x[0];
+	}
+
+	static Value back(Value x) {
+		return x[x.length - 1];
+	}
+
 	static Value get(Value x, Value key, Value def) {
 		Value result;
 		if (x.has(key, &result))
@@ -93,6 +101,8 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["length"] = Value(&length);
 	globals["empty"] = Value(&empty);
 	globals["keys"] = Value(&keys);
+	globals["front"] = Value(&front);
+	globals["back"] = Value(&back);
 
 	globals["integer"] = Value(&tointeger);
 	globals["float"] = Value(&tofloat);
@@ -134,14 +144,6 @@ void bindLibString(ref Value[string] globals) {
 		return x.get!string.strip;
 	}
 
-	static long indexOf(Value[] x) {
-		auto haystack = x[0].get!string;
-		auto needle = x[1].get!string;
-		auto start = (x.length > 2) ? x[2].get!size_t : 0;
-
-		return haystack.indexOf(needle, start);
-	}
-
 	static string lower(Value x) {
 		return x.get!string.toLower();
 	}
@@ -150,12 +152,20 @@ void bindLibString(ref Value[string] globals) {
 		return x.get!string.toUpper();
 	}
 
+	static long indexOf(Value[] x) {
+		auto haystack = x[0].get!string;
+		auto needle = x[1].get!string;
+		auto start = (x.length > 2) ? x[2].get!size_t : 0;
+
+		return haystack.indexOf(needle, start);
+	}
+
 	globals["join"] = Value(&join);
 	globals["split"] = Value(&split);
 	globals["strip"] = Value(&strip);
-	globals["indexOf"] = Value(&indexOf);
 	globals["lower"] = Value(&lower);
 	globals["upper"] = Value(&upper);
+	globals["indexOf"] = Value(&indexOf);
 }
 
 
@@ -212,23 +222,23 @@ string escapeJS(string x) {
 
 	foreach (ch; x.byDchar) {
 		switch (ch) {
-			case '\\':
-				app.put(`\\`);
-				break;
-			case '\'':
-				app.put(`\'`);
-				break;
-			case '\"':
-				app.put(`\"`);
-				break;
-			case '\r':
-				break;
-			case '\n':
-				app.put(`\n`);
-				break;
-			default:
-				app.put(ch);
-				break;
+		case '\\':
+			app.put(`\\`);
+			break;
+		case '\'':
+			app.put(`\'`);
+			break;
+		case '\"':
+			app.put(`\"`);
+			break;
+		case '\r':
+			break;
+		case '\n':
+			app.put(`\n`);
+			break;
+		default:
+			app.put(ch);
+			break;
 		}
 	}
 	return app.data;
