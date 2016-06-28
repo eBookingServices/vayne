@@ -136,7 +136,7 @@ struct VM(uint options = VMOptions.Default) {
 				case Halt:
 					return;
 				case Move:
-					regs_[instr.arg!0] = getArgV!1;
+					regs_.ptr[instr.arg!0] = getArgV!1;
 					break;
 				case Throw:
 					throw new Exception(getArgV!0.toString);
@@ -152,34 +152,34 @@ struct VM(uint options = VMOptions.Default) {
 					}
 					break;
 				case PushScope:
-					auto s = getArgV!0;
-					switch (s.type) with (Value.Type) {
+					auto scope_ = getArgV!0;
+					switch (scope_.type) with (Value.Type) {
 					case Object:
 					case AssocArray:
 						scopes_ ~= getArgV!0;
 						break;
 					default:
-						throw new Exception(format("with statement expressions must be of type %s or %s, not %s", Object, AssocArray, s.type));
+						throw new Exception(format("with statement expressions must be of type %s or %s, not %s", Object, AssocArray, scope_.type));
 					}
 					break;
 				case PopScope:
 					scopes_.length = scopes_.length - instr.arg!0;
 					break;
 				case Minus:
-					regs_[instr.arg!0].unaryOp!"-";
+					regs_.ptr[instr.arg!0].unaryOp!"-";
 					break;
 				case Not:
-					regs_[instr.arg!0] = Value(!regs_[instr.arg!0].get!bool);
+					regs_.ptr[instr.arg!0] = Value(!regs_.ptr[instr.arg!0].get!bool);
 					break;
 				case Decrement:
-					regs_[instr.arg!0].unaryOp!"--";
+					regs_.ptr[instr.arg!0].unaryOp!"--";
 					break;
 				case Increment:
-					regs_[instr.arg!0].unaryOp!"++";
+					regs_.ptr[instr.arg!0].unaryOp!"++";
 					break;
 				case Jump:
 					ip = instr.arg!0;
-					instr = instrs_[ip];
+					instr = instrs_.ptr[ip];
 					continue;
 				case JumpIfZero:
 					if (getArgV!1.get!long == 0)
@@ -190,73 +190,73 @@ struct VM(uint options = VMOptions.Default) {
 						goto case Jump;
 					break;
 				case And:
-					regs_[instr.arg!0] = argCompareOp!(1, "&&", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "&&", 2);
 					break;
 				case Or:
-					regs_[instr.arg!0] = argCompareOp!(1, "||", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "||", 2);
 					break;
 				case Add:
-					regs_[instr.arg!0] = argBinaryOp!(1, "+", 2);
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "+", 2);
 					break;
 				case Subtract:
-					regs_[instr.arg!0] = argBinaryOp!(1, "-", 2);
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "-", 2);
 					break;
 				case Multiply:
-					regs_[instr.arg!0] = argBinaryOp!(1, "*", 2);
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "*", 2);
 					break;
 				case Divide:
-					regs_[instr.arg!0] = argBinaryOp!(1, "/", 2);
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "/", 2);
 					break;
 				case Remainder:
-					regs_[instr.arg!0] = argBinaryOp!(1, "%", 2);
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "%", 2);
 					break;
 				case Power:
-					regs_[instr.arg!0] = argBinaryOp!(1, "^^", 2);
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "^^", 2);
 					break;
 				case Concat:
-					regs_[instr.arg!0] = getArgV!1.concatOp(getArgV!2);
+					regs_.ptr[instr.arg!0] = getArgV!1.concatOp(getArgV!2);
 					break;
 				case Test:
-					regs_[instr.arg!0] = Value(getArgV!1.get!bool);
+					regs_.ptr[instr.arg!0] = Value(getArgV!1.get!bool);
 					break;
 				case Equal:
-					regs_[instr.arg!0] = argCompareOp!(1, "==", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "==", 2);
 					break;
 				case NotEqual:
-					regs_[instr.arg!0] = argCompareOp!(1, "!=", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "!=", 2);
 					break;
 				case Less:
-					regs_[instr.arg!0] = argCompareOp!(1, "<", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "<", 2);
 					break;
 				case LessOrEqual:
-					regs_[instr.arg!0] = argCompareOp!(1, "<=", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "<=", 2);
 					break;
 				case Greater:
-					regs_[instr.arg!0] = argCompareOp!(1, ">", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, ">", 2);
 					break;
 				case GreaterOrEqual:
-					regs_[instr.arg!0] = argCompareOp!(1, ">=", 2);
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, ">=", 2);
 					break;
 				case Length:
-					regs_[instr.arg!0] = Value(getArgV!1.length);
+					regs_.ptr[instr.arg!0] = Value(getArgV!1.length);
 					break;
 				case Keys:
-					regs_[instr.arg!0] = getArgV!1.keys();
+					regs_.ptr[instr.arg!0] = getArgV!1.keys();
 					break;
 				case TestKey:
-					regs_[instr.arg!0] = Value(getArgV!1.has(getArgV!2));
+					regs_.ptr[instr.arg!0] = Value(getArgV!1.has(getArgV!2));
 					break;
 				case Key:
-					regs_[instr.arg!0] = getArgV!1.key(getArgV!2);
+					regs_.ptr[instr.arg!0] = getArgV!1.key(getArgV!2);
 					break;
 				case Slice:
-					regs_[instr.arg!0] = getArgV!1[getArgV!2..getArgV!3];
+					regs_.ptr[instr.arg!0] = getArgV!1[getArgV!2..getArgV!3];
 					break;
 				case Dispatch:
 					assert(!dispatchArg_);
 
 					auto name = getArgV!2;
-					auto pout = &regs_[instr.arg!0];
+					auto pout = &regs_.ptr[instr.arg!0];
 
 					auto obj = getArgV!1;
 					switch (obj.type) with (Value.Type) {
@@ -279,14 +279,13 @@ struct VM(uint options = VMOptions.Default) {
 						}
 					}
 
-					*pout = getArgV!1[name];
-					break;
+					throw new Exception(format("dispatch failed for identifier '%s'", name.get!string));
 				case Element:
-					regs_[instr.arg!0] = getArgV!1[getArgV!2];
+					regs_.ptr[instr.arg!0] = getArgV!1[getArgV!2];
 					break;
 				case LookUp:
 					auto name = getArgV!1;
-					auto pout = &regs_[instr.arg!0];
+					auto pout = &regs_.ptr[instr.arg!0];
 
 					foreach_reverse (ref s; scopes_) {
 						if (s.has(name, pout))
@@ -304,23 +303,23 @@ struct VM(uint options = VMOptions.Default) {
 					break;
 				case Call:
 					auto func = getArgV!1;
-					func.call(regs_[instr.arg!0], regs_[instr.arg!2..instr.arg!2 + instr.arg!3]);
+					func.call(regs_.ptr[instr.arg!0], regs_.ptr[instr.arg!2..instr.arg!2 + instr.arg!3]);
 					break;
 				case DispatchCall:
 					auto func = getArgV!1;
 					if (dispatchArg_) {
-						func.call(regs_[instr.arg!0], regs_[instr.arg!2..instr.arg!2 + instr.arg!3]);
+						func.call(regs_.ptr[instr.arg!0], regs_.ptr[instr.arg!2..instr.arg!2 + instr.arg!3]);
 						dispatchArg_ = false;
 					} else {
-						func.call(regs_[instr.arg!0], regs_[1 + instr.arg!2..instr.arg!2 + instr.arg!3]);
+						func.call(regs_.ptr[instr.arg!0], regs_.ptr[1 + instr.arg!2..instr.arg!2 + instr.arg!3]);
 					}
 					break;
 				}
 
 				if (++ip >= instrs_.length)
 					break;
-				instr = instrs_[ip];
-			} catch (Exception e) {
+				instr = instrs_.ptr[ip];
+			} catch (Throwable e) {
 				auto loc = locs_[ip];
 				if (errorHandler_) {
 					errorHandler_(Error(e.msg, sources_[loc.id], loc.line));
