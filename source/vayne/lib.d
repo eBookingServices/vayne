@@ -64,7 +64,7 @@ void bindLibBasic(ref Value[string] globals) {
 	}
 
 	static string tostring(Value x) {
-		return x.get!string;
+		return x.toString();
 	}
 
 	static bool tobool(Value x) {

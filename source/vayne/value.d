@@ -399,7 +399,43 @@ struct Value {
 	}
 
 	string toString() const {
-		return get!string;
+		final switch (type) with (Type) {
+		case Undefined:
+			return "undefined";
+		case Null:
+			return "null";
+		case Bool:
+			return storage_.b.to!string;
+		case Integer:
+			return storage_.l.to!string;
+		case Float:
+			return storage_.d.to!string;
+		case String:
+			return storage_.s.to!string;
+		case Function:
+			static if ((void*).sizeof == 4) {
+				return format("[function 0x%08x:0x%08x]", storage_.f.self, storage_.f.ptr);
+			} else {
+				return format("[function 0x%016x:0x%016x]", storage_.f.self, storage_.f.ptr);
+			}
+		case Array:
+			return storage_.a.to!string;
+		case AssocArray:
+			return storage_.aa.to!string;
+		case Object:
+			if (auto tostring = "__tostring" in storage_.o) {
+				Value result;
+				tostring.call(result, null);
+				return result.get!string;
+			}
+			return storage_.o.to!string;
+		case Pointer:
+			static if ((void*).sizeof == 4) {
+				return format("[pointer 0x%08x]", storage_.p);
+			} else {
+				return format("[pointer 0x%016x]", storage_.p);
+			}
+		}
 	}
 
 	T get(T)() const if (is(Unqual!T == Value)) {
@@ -409,9 +445,19 @@ struct Value {
 	T get(T)() const if (isSomeString!T) {
 		final switch (type) with (Type) {
 		case Undefined:
-			return "undefined";
 		case Null:
-			return "null";
+		case Function:
+		case Array:
+		case AssocArray:
+		case Pointer:
+			throw new Exception(format("cannot convert %s to string", type));
+		case Object:
+			if (auto tostring = "__tostring" in storage_.o) {
+				Value result;
+				tostring.call(result, null);
+				return result.get!T;
+			}
+			goto case AssocArray;
 		case Bool:
 			return storage_.b.to!T;
 		case Integer:
@@ -420,29 +466,6 @@ struct Value {
 			return storage_.d.to!T;
 		case String:
 			return storage_.s.to!T;
-		case Function:
-			static if ((void*).sizeof == 4) {
-				return format("[function 0x%08x:0x%08x]", storage_.f.self, storage_.f.ptr);
-			} else {
-				return format("[function 0x%016x:0x%016x]", storage_.f.self, storage_.f.ptr);
-			}
-		case Array:
-			return storage_.a.to!T;
-		case AssocArray:
-			return storage_.aa.to!T;
-		case Object:
-			if (auto tostring = "__tostring" in storage_.o) {
-				Value result;
-				tostring.call(result, null);
-				return result.get!T;
-			}
-			return storage_.o.to!T;
-		case Pointer:
-			static if ((void*).sizeof == 4) {
-				return format("[pointer 0x%08x]", storage_.p);
-			} else {
-				return format("[pointer 0x%016x]", storage_.p);
-			}
 		}
 	}
 
@@ -768,26 +791,6 @@ struct Value {
 			return Value(storage_.s[start..end]);
 		case Array:
 			return Value(storage_.a[start..end]);
-		}
-	}
-
-	Value key(in Value index) const {
-		final switch (type) with (Type) {
-		case Null:
-		case Undefined:
-		case Bool:
-		case Integer:
-		case Float:
-		case Function:
-		case Pointer:
-			throw new Exception(format("indexing not allowed for type %s", type));
-		case String:
-		case Array:
-			return Value(index.get!size_t);
-		case AssocArray:
-			return Value(storage_.aa.keys()[index.get!size_t]);
-		case Object:
-			return Value(storage_.o.keys()[index.get!size_t]);
 		}
 	}
 
