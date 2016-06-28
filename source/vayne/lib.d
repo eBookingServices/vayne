@@ -119,6 +119,32 @@ void bindLibBasic(ref Value[string] globals) {
 }
 
 
+void bindLibMath(ref Value[string] globals) {
+	import std.math;
+
+	static Value abs(Value x) {
+		final switch (x.type) with (Value.Type) {
+		case Undefined:
+		case Function:
+		case String:
+		case Array:
+		case AssocArray:
+		case Object:
+		case Pointer:
+		case Null:
+		case Bool:
+			return x;
+		case Integer:
+			return Value(std.math.abs(x.get!long));
+		case Float:
+			return Value(std.math.abs(x.get!double));
+		}
+	}
+
+	globals["abs"] = Value(&abs);
+}
+
+
 void bindLibString(ref Value[string] globals) {
 	static string join(Value[] x) {
 		auto app = appender!string;
@@ -216,6 +242,7 @@ void bindLibString(ref Value[string] globals) {
 void bindLibDefault(ref Value[string] globals) {
 	bindLibBasic(globals);
 	bindLibString(globals);
+	bindLibMath(globals);
 }
 
 
