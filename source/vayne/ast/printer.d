@@ -44,11 +44,13 @@ class Printer(Appender) : Visitor {
 	}
 
 	override void visit(BinaryOp node) {
+		app.put("(");
 		node.children[0].accept(this);
 		app.put(" ");
 		app.put(node.tok.toString);
 		app.put(" ");
 		node.children[1].accept(this);
+		app.put(")");
 	}
 
 	override void visit(ConditionalExpression node) {

@@ -750,17 +750,21 @@ private struct ExprParser {
 			if (!prio || (prio < prioExpr))
 				return left;
 			auto op = eat();
-			auto right = parseExpressionPrimary();
-			if (!right)
-				return null;
-			auto prioNext = isBinaryOp(tok_.name);
-			if (prio < prioNext) {
-				right = parseBinaryOp(right, prio + 1);
+			if (prio == OperatorPriority.Logic) {
+				auto right = parseExpression();
+				left = create!BinaryOp(op, left, right);
+			} else {
+				auto right = parseExpressionPrimary();
 				if (!right)
 					return null;
+				auto prioNext = isBinaryOp(tok_.name);
+				if (prio < prioNext) {
+					right = parseBinaryOp(right, prio + 1);
+					if (!right)
+						return null;
+				}
+				left = create!BinaryOp(op, left, right);
 			}
-
-			left = create!BinaryOp(op, left, right);
 		}
 	}
 
