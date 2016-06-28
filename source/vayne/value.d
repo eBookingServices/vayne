@@ -494,7 +494,6 @@ struct Value {
 	T get(T)() const if (isBoolean!T) {
 		final switch (type) with (Type) {
 		case Null:
-		case Undefined:
 			return false;
 		case Bool:
 			return storage_.b;
@@ -506,6 +505,7 @@ struct Value {
 			return storage_.s.length != 0;
 		case Pointer:
 			return storage_.p != null;
+		case Undefined:
 		case Function:
 		case Array:
 		case AssocArray:
@@ -517,10 +517,10 @@ struct Value {
 	T get(T)() const if (isPointer!T) {
 		final switch (type) with (Type) {
 		case Null:
-		case Undefined:
 			return null;
 		case Pointer:
 			return cast(T)storage_.p;
+		case Undefined:
 		case Bool:
 		case Integer:
 		case String:

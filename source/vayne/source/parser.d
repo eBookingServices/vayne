@@ -180,6 +180,7 @@ private:
 				withs(context, content);
 				break;
 			case "&":
+				ensureSimpleTag(tag);
 				break;
 			default:
 				interpolate(context, content, tagOpen.length == 2);
