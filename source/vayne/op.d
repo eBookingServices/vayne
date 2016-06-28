@@ -49,7 +49,6 @@ enum OpCode : ulong {
 	Length,
 	Keys,
 	TestKey,
-	Key,
 	Slice,
 	Dispatch,
 	Element,
@@ -190,7 +189,6 @@ struct Instr {
 		case Greater:
 		case GreaterOrEqual:
 		case TestKey:
-		case Key:
 		case Dispatch:
 		case Element:
 			static if (argCount == 3) {
@@ -306,7 +304,6 @@ struct Instr {
 		case Remainder:
 		case Power:
 		case Concat:
-		case Key:
 		case Slice:
 		case Dispatch:
 		case Element:
@@ -372,7 +369,6 @@ struct Instr {
 		case Greater:
 		case GreaterOrEqual:
 		case TestKey:
-		case Key:
 		case Dispatch:
 		case Element:
 			return format("%s %s %s %s", name, argName!0, argName!1, argName!2);

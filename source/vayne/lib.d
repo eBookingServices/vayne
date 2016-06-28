@@ -152,16 +152,60 @@ void bindLibString(ref Value[string] globals) {
 		return x.get!string.toUpper();
 	}
 
-	static long indexOf(Value[] x) {
-		auto haystack = x[0].get!string;
-		auto needle = x[1].get!string;
-		auto start = (x.length > 2) ? x[2].get!size_t : 0;
+	static long indexOf(Value[] args) {
+		auto haystack = args[0].get!string;
+		auto needle = args[1].get!string;
+		auto start = (args.length > 2) ? args[2].get!size_t : 0;
 
 		return haystack.indexOf(needle, start);
 	}
 
+	static string format(Value[] args) {
+		auto fmt = args[0].get!string;
+		auto spec = FormatSpec!char(fmt);
+
+		auto app = appender!string;
+		app.reserve(max(32, fmt.length + fmt.length >> 1));
+
+		size_t arg = 1;
+    	while (spec.writeUpToNextSpec(&app)) {
+			if (arg >= args.length)
+				break;
+
+			auto value = args[arg++];
+			final switch (value.type) with (Value.Type) {
+			case Undefined:
+			case Function:
+			case String:
+			case Array:
+			case AssocArray:
+			case Object:
+			case Pointer:
+				formatValue(&app, value.get!string, spec);
+				break;
+			case Null:
+				formatValue(&app, null, spec);
+				break;
+			case Bool:
+				formatValue(&app, value.get!bool, spec);
+				break;
+			case Integer:
+				formatValue(&app, value.get!long, spec);
+				break;
+			case Float:
+				formatValue(&app, value.get!double, spec);
+				break;
+			}
+    	}
+
+		if (arg != args.length)
+			throw new Exception(std.format.format("number of arguments doesn't match number of format specifiers - expected %d, got %d", arg - 1, args.length - 1));
+		return app.data;
+	}
+
 	globals["join"] = Value(&join);
 	globals["split"] = Value(&split);
+	globals["format"] = Value(&format);
 	globals["strip"] = Value(&strip);
 	globals["lower"] = Value(&lower);
 	globals["upper"] = Value(&upper);

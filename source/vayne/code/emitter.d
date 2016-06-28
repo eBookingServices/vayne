@@ -560,9 +560,11 @@ private:
 		} else {
 			// array / object
 			auto obj = emitExpression(node.children[0]);
+			auto keys = register();
 			auto len = register();
 
-			emit(OpCode.Length, node.tok.loc, len, obj);
+			emit(OpCode.Keys, node.tok.loc, keys, obj);
+			emit(OpCode.Length, node.tok.loc, len, keys);
 
 			auto it = registerize(node.tok.loc, constant(ConstantSlot.Type.Integer, "0"));
 			auto key = register();
@@ -579,14 +581,14 @@ private:
 			size_t jumpBody = placeholder(node.tok.loc);
 			release(cond);
 
-			emit(OpCode.Key, node.tok.loc, key, obj, it);
+			emit(OpCode.Element, node.tok.loc, key, keys, it);
 			emit(OpCode.Element, node.tok.loc, value, obj, key);
 
 			emitStatementBlock(body_);
 			emit(OpCode.Increment, node.tok.loc, it);
 			emit(OpCode.Jump, node.tok.loc, Value(Value.Kind.Immediate, test));
 			emitAt(OpCode.JumpIfZero, node.tok.loc, jumpBody, Value(Value.Kind.Immediate, ip), cond);
-			release(it, len, obj, key, value);
+			release(it, keys, len, obj, key, value);
 		}
 
 		popScope();

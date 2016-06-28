@@ -246,9 +246,6 @@ struct VM(uint options = VMOptions.Default) {
 				case TestKey:
 					regs_.ptr[instr.arg!0] = Value(getArgV!1.has(getArgV!2));
 					break;
-				case Key:
-					regs_.ptr[instr.arg!0] = getArgV!1.key(getArgV!2);
-					break;
 				case Slice:
 					regs_.ptr[instr.arg!0] = getArgV!1[getArgV!2..getArgV!3];
 					break;
