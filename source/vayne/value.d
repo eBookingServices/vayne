@@ -233,8 +233,8 @@ struct Value {
 		foreach (Member; __traits(derivedMembers, T)) {
 			enum callable = !NotCallableNames.canFind(Member);
 
-			static if (is(typeof(__traits(getMember, T, Member))) && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
-				static if (callable && is(typeof(&__traits(getMember, x, Member)) == delegate) && isCompatibleFunction!(typeof(&__traits(getMember, x, Member)))) {
+			static if (is(FunctionTypeOf!(__traits(getMember, T, Member))) && (__traits(getProtection, __traits(getMember, x, Member)) == "public") && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
+				static if (callable && isCompatibleFunction!(typeof(&__traits(getMember, x, Member)))) {
 					enum bindable = !NotBindableNames.canFind(Member);
 
 					alias Args = ParameterTypeTuple!(typeof(&__traits(getMember, x, Member)));
