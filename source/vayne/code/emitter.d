@@ -118,7 +118,7 @@ private:
 			final switch (node.tok.kindLiteral) with (Token.LiteralKind) {
 			case Char:
 			case String:
-				return constant(ConstantSlot.Type.String, node.tok.value);
+				return constant(ConstantSlot.Type.String, node.tok.unescaped);
 			case Bin:
 				return constant(ConstantSlot.Type.Integer, node.tok.value);
 			case Oct:

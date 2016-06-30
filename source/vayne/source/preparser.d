@@ -240,7 +240,7 @@ private:
 							if (tok.ident) {
 								args ~= expand(lex, context, tok.value);
 							} else {
-								args ~= tok.escaped;
+								args ~= tok.unescaped;
 							}
 
 							tok = expect(lex, context, ",", ")");

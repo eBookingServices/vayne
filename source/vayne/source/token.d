@@ -41,7 +41,7 @@ struct Token {
 
 	enum Flags : ubyte {
 		None 			= 0,
-		NeedsEscaping   = 1 << 0,
+		NeedsUnescaping   = 1 << 0,
 	}
 
 	this(SourceLoc loc) {
@@ -128,9 +128,9 @@ struct Token {
 		return loc_;
 	}
 
-	auto needsEscaping() const {
+	auto needsUnescaping() const {
 		assert(kind_ == Kind.Literal);
-		return (flags_ & Flags.NeedsEscaping) != 0;
+		return (flags_ & Flags.NeedsUnescaping) != 0;
 	}
 
 	string value() const {
@@ -197,7 +197,7 @@ struct Token {
 		return cast(Kind)(kind_);
 	}
 
-	@property auto escaped() const {
+	@property auto unescaped() const {
 		static int hexValue(char x) {
 			assert(isHexDigit(x));
 			return (x <= '9') ? (x - '0') : (10 + (toLower(x) - 'a'));
@@ -205,7 +205,7 @@ struct Token {
 
 		assert(kind == Kind.Literal);
 
-		if (!needsEscaping)
+		if (!needsUnescaping)
 			return value;
 
 		auto ptr = name_.ptr;

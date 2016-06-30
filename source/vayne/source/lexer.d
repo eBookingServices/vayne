@@ -356,7 +356,7 @@ private:
 
 	Token eatString(immutable(char) ch, ref immutable(char)* ptr, immutable(char)* end) {
 		auto start = ptr;
-		auto needsEscaping = false;
+		auto needsUnescaping = false;
 
 		while ((ptr != end) && (*ptr != ch)) {
 			if (*ptr != '\\') {
@@ -366,7 +366,7 @@ private:
 			} else {
 				++ptr;
 				if (ptr != end) {
-					needsEscaping = true;
+					needsUnescaping = true;
 					++ptr;
 				}
 			}
@@ -377,8 +377,8 @@ private:
 
 		++ptr;
 		size_t flags = 0;
-		if (needsEscaping && (ch != '`'))
-			flags |= Token.Flags.NeedsEscaping;
+		if (needsUnescaping && (ch != '`'))
+			flags |= Token.Flags.NeedsUnescaping;
 
 		auto suffixSize = eatSuffix(ptr, end);
 
