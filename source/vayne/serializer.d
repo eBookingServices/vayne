@@ -162,8 +162,13 @@ struct ByteStreamWriter {
 	}
 
 	void put(T)(T x) if (is(Unqual!T == string)) {
-		if (offset_ + T.sizeof > stream_.length)
-			stream_.length += 16 * 1024;
+		auto req = offset_ + uint.sizeof + x.length;
+		if (req > stream_.length) {
+			auto len = stream_.length + 16 * 1024;
+			while (req >= len)
+				len += 16 * 1024;
+			stream_.length = len;
+		}
 
 		put!uint(cast(uint)x.length);
 
