@@ -182,7 +182,8 @@ struct VM(uint options = VMOptions.Default) {
 						}
 					}
 
-					throw new Exception(format("lookup failed for identifier '%s'", name.get!string));
+					*pout = Value.init;
+					break;
 				case Call:
 					auto func = getArgV!1;
 					func.call(regs_.ptr[instr.arg!0], regs_.ptr[instr.arg!2..instr.arg!2 + instr.arg!3]);
