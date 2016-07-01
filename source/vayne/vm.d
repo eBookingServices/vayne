@@ -108,9 +108,9 @@ struct VM(uint options = VMOptions.Default) {
 
 		ref auto getArgV(size_t Arg)() if (Arg <= 3) {
 			if (instr.argConst!Arg) {
-				return consts_[instr.arg!Arg];
+				return consts_.ptr[instr.arg!Arg];
 			} else {
-				return regs_[instr.arg!Arg];
+				return regs_.ptr[instr.arg!Arg];
 			}
 		}
 
@@ -131,15 +131,6 @@ struct VM(uint options = VMOptions.Default) {
 
 			try {
 				Lswitch: final switch (op) with (OpCode) {
-				case Nop:
-					break;
-				case Halt:
-					return;
-				case Move:
-					regs_.ptr[instr.arg!0] = getArgV!1;
-					break;
-				case Throw:
-					throw new Exception(getArgV!0.toString);
 				case Output:
 					static if (isOutputRange!(T, char)) {
 						output.put(getArgV!0.get!string);
@@ -151,28 +142,11 @@ struct VM(uint options = VMOptions.Default) {
 						write(getArgV!0.get!string);
 					}
 					break;
-				case PushScope:
-					auto scope_ = getArgV!0;
-					switch (scope_.type) with (Value.Type) {
-					case Object:
-					case AssocArray:
-						scopes_ ~= getArgV!0;
-						break;
-					default:
-						throw new Exception(format("with statement expressions must be of type %s or %s, not %s", Object, AssocArray, scope_.type));
-					}
+				case Move:
+					regs_.ptr[instr.arg!0] = getArgV!1;
 					break;
-				case PopScope:
-					scopes_.length = scopes_.length - instr.arg!0;
-					break;
-				case Minus:
-					regs_.ptr[instr.arg!0].unaryOp!"-";
-					break;
-				case Not:
-					regs_.ptr[instr.arg!0] = Value(!regs_.ptr[instr.arg!0].get!bool);
-					break;
-				case Decrement:
-					regs_.ptr[instr.arg!0].unaryOp!"--";
+				case Test:
+					regs_.ptr[instr.arg!0] = Value(getArgV!1.get!bool);
 					break;
 				case Increment:
 					regs_.ptr[instr.arg!0].unaryOp!"++";
@@ -189,65 +163,38 @@ struct VM(uint options = VMOptions.Default) {
 					if (getArgV!1.get!long != 0)
 						goto case Jump;
 					break;
-				case And:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, "&&", 2);
+				case Element:
+					regs_.ptr[instr.arg!0] = getArgV!1[getArgV!2];
 					break;
-				case Or:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, "||", 2);
+				case LookUp:
+					auto name = getArgV!1;
+					auto pout = &regs_.ptr[instr.arg!0];
+
+					foreach_reverse (ref s; scopes_) {
+						if (s.has(name, pout))
+							break Lswitch;
+					}
+
+					if (name.type == Value.Type.String) {
+						if (auto pvalue = name.get!string in globals_) {
+							*pout = *pvalue;
+							break Lswitch;
+						}
+					}
+
+					throw new Exception(format("lookup failed for identifier '%s'", name.get!string));
+				case Call:
+					auto func = getArgV!1;
+					func.call(regs_.ptr[instr.arg!0], regs_.ptr[instr.arg!2..instr.arg!2 + instr.arg!3]);
 					break;
-				case Add:
-					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "+", 2);
-					break;
-				case Subtract:
-					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "-", 2);
-					break;
-				case Multiply:
-					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "*", 2);
-					break;
-				case Divide:
-					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "/", 2);
-					break;
-				case Remainder:
-					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "%", 2);
-					break;
-				case Power:
-					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "^^", 2);
-					break;
-				case Concat:
-					regs_.ptr[instr.arg!0] = getArgV!1.concatOp(getArgV!2);
-					break;
-				case Test:
-					regs_.ptr[instr.arg!0] = Value(getArgV!1.get!bool);
-					break;
-				case Equal:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, "==", 2);
-					break;
-				case NotEqual:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, "!=", 2);
-					break;
-				case Less:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, "<", 2);
-					break;
-				case LessOrEqual:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, "<=", 2);
-					break;
-				case Greater:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, ">", 2);
-					break;
-				case GreaterOrEqual:
-					regs_.ptr[instr.arg!0] = argCompareOp!(1, ">=", 2);
-					break;
-				case Length:
-					regs_.ptr[instr.arg!0] = Value(getArgV!1.length);
-					break;
-				case Keys:
-					regs_.ptr[instr.arg!0] = getArgV!1.keys();
-					break;
-				case TestKey:
-					regs_.ptr[instr.arg!0] = Value(getArgV!1.has(getArgV!2));
-					break;
-				case Slice:
-					regs_.ptr[instr.arg!0] = getArgV!1[getArgV!2..getArgV!3];
+				case DispatchCall:
+					auto func = getArgV!1;
+					if (dispatchArg_) {
+						func.call(regs_.ptr[instr.arg!0], regs_.ptr[instr.arg!2..instr.arg!2 + instr.arg!3]);
+						dispatchArg_ = false;
+					} else {
+						func.call(regs_.ptr[instr.arg!0], regs_.ptr[1 + instr.arg!2..instr.arg!2 + instr.arg!3]);
+					}
 					break;
 				case Dispatch:
 					assert(!dispatchArg_);
@@ -277,40 +224,92 @@ struct VM(uint options = VMOptions.Default) {
 					}
 
 					throw new Exception(format("dispatch failed for identifier '%s'", name.get!string));
-				case Element:
-					regs_.ptr[instr.arg!0] = getArgV!1[getArgV!2];
+				case Decrement:
+					regs_.ptr[instr.arg!0].unaryOp!"--";
 					break;
-				case LookUp:
-					auto name = getArgV!1;
-					auto pout = &regs_.ptr[instr.arg!0];
-
-					foreach_reverse (ref s; scopes_) {
-						if (s.has(name, pout))
-							break Lswitch;
-					}
-
-					if (name.type == Value.Type.String) {
-						if (auto pvalue = name.get!string in globals_) {
-							*pout = *pvalue;
-							break Lswitch;
-						}
-					}
-
-					*pout = Value.init;
+				case Concat:
+					regs_.ptr[instr.arg!0] = getArgV!1.concatOp(getArgV!2);
 					break;
-				case Call:
-					auto func = getArgV!1;
-					func.call(regs_.ptr[instr.arg!0], regs_.ptr[instr.arg!2..instr.arg!2 + instr.arg!3]);
-					break;
-				case DispatchCall:
-					auto func = getArgV!1;
-					if (dispatchArg_) {
-						func.call(regs_.ptr[instr.arg!0], regs_.ptr[instr.arg!2..instr.arg!2 + instr.arg!3]);
-						dispatchArg_ = false;
-					} else {
-						func.call(regs_.ptr[instr.arg!0], regs_.ptr[1 + instr.arg!2..instr.arg!2 + instr.arg!3]);
+				case PushScope:
+					auto scope_ = getArgV!0;
+					switch (scope_.type) with (Value.Type) {
+					case Object:
+					case AssocArray:
+						scopes_ ~= getArgV!0;
+						break;
+					default:
+						throw new Exception(format("with statement expressions must be of type %s or %s, not %s", Object, AssocArray, scope_.type));
 					}
 					break;
+				case PopScope:
+					scopes_.length = scopes_.length - instr.arg!0;
+					break;
+				case Equal:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "==", 2);
+					break;
+				case NotEqual:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "!=", 2);
+					break;
+				case Less:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "<", 2);
+					break;
+				case LessOrEqual:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "<=", 2);
+					break;
+				case Greater:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, ">", 2);
+					break;
+				case GreaterOrEqual:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, ">=", 2);
+					break;
+				case Not:
+					regs_.ptr[instr.arg!0] = Value(!regs_.ptr[instr.arg!0].get!bool);
+					break;
+				case And:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "&&", 2);
+					break;
+				case Or:
+					regs_.ptr[instr.arg!0] = argCompareOp!(1, "||", 2);
+					break;
+				case Minus:
+					regs_.ptr[instr.arg!0].unaryOp!"-";
+					break;
+				case Add:
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "+", 2);
+					break;
+				case Subtract:
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "-", 2);
+					break;
+				case Multiply:
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "*", 2);
+					break;
+				case Divide:
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "/", 2);
+					break;
+				case Remainder:
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "%", 2);
+					break;
+				case Power:
+					regs_.ptr[instr.arg!0] = argBinaryOp!(1, "^^", 2);
+					break;
+				case Length:
+					regs_.ptr[instr.arg!0] = Value(getArgV!1.length);
+					break;
+				case Keys:
+					regs_.ptr[instr.arg!0] = getArgV!1.keys();
+					break;
+				case TestKey:
+					regs_.ptr[instr.arg!0] = Value(getArgV!1.has(getArgV!2));
+					break;
+				case Slice:
+					regs_.ptr[instr.arg!0] = getArgV!1[getArgV!2..getArgV!3];
+					break;
+				case Nop:
+					break;
+				case Halt:
+					return;
+				case Throw:
+					throw new Exception(getArgV!0.toString);
 				}
 
 				if (++ip >= instrs_.length)

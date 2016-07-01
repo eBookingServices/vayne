@@ -295,7 +295,7 @@ struct Value {
 			return mixin("(storage_.l != 0)" ~ op ~ "(other.storage_.l != 0)");
 		case Integer:
 		case Float:
-			return mixin("storage_.l" ~ op ~"other.storage_.l");
+			return mixin("storage_.l" ~ op ~ "other.storage_.l");
 		case String:
 			return mixin("storage_.s" ~ op ~ "other.storage_.s");
 		case Function:
@@ -317,16 +317,21 @@ struct Value {
 	}
 
 	auto binaryOp(string op)(Value other) {
-		if (type != other.type)
-			throw new Exception(format("binary op '%s' not allowed between types %s and %s", op, type, other.type));
-
 		final switch (type) with (Type) {
 		case Bool:
 			return Value(mixin("storage_.b " ~ op ~ " other.storage_.b"));
 		case Integer:
-			return Value(mixin("storage_.l " ~ op ~ " other.storage_.l"));
+			if (other.type == Integer)
+				return Value(mixin("storage_.l " ~ op ~ " other.storage_.l"));
+			if (other.type == Float)
+				return Value(mixin("storage_.l " ~ op ~ " other.storage_.d"));
+			break;
 		case Float:
-			return Value(mixin("storage_.d " ~ op ~ " other.storage_.d"));
+			if (other.type == Float)
+				return Value(mixin("storage_.d " ~ op ~ " other.storage_.d"));
+			if (other.type == Integer)
+				return Value(mixin("storage_.d " ~ op ~ " other.storage_.l"));
+			break;
 		case Null:
 		case Undefined:
 		case String:
@@ -335,8 +340,12 @@ struct Value {
 		case AssocArray:
 		case Object:
 		case Pointer:
-			throw new Exception(format("binary op '%s' not allowed for type %s", op, type));
+			break;
 		}
+
+		if (type != other.type)
+			throw new Exception(format("binary op '%s' not allowed between types %s and %s", op, type, other.type));
+		throw new Exception(format("binary op '%s' not allowed for type %s", op, type));
 	}
 
 	void unaryOp(string op)() {
