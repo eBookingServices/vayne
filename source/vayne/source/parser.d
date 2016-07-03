@@ -90,7 +90,7 @@ private:
 			if (indexOpen == -1)
 				break;
 
-			escaper(context, remaining[0..indexOpen]);
+			text(context, remaining[0..indexOpen]);
 			context.advance(indexOpen);
 
 			const triple = ((indexOpen + 1 < remaining.length) && (remaining[indexOpen + 2] == '{'));
@@ -122,10 +122,12 @@ private:
 		context.expectClosed();
 
 		if (context.cursor > 0) {
-			escaper(context, context.remaining());
+			text(context, context.remaining());
 		} else {
-			escaper(context, source.buffer);
+			text(context, source.buffer);
 		}
+
+		outputText(context);
 
 		context.advance(context.remaining.length);
 
@@ -148,21 +150,27 @@ private:
 			switch(tag) {
 			case "*":
 				ensureSimpleTag(tag);
+				outputText(context);
 				iterate(context, content);
 				break;
 			case "/":
 				ensureSimpleTag(tag);
+				if (context.open().tag != "@")
+					outputText(context);
 				close(context, content);
 				break;
 			case "?":
 				ensureSimpleTag(tag);
+				outputText(context);
 				conditional(context, content);
 				break;
 			case ":":
 				ensureSimpleTag(tag);
+				outputText(context);
 				orElse(context, content);
 				break;
 			case "~":
+				outputText(context);
 				translate(context, content, tagOpen.length == 2);
 				break;
 			case ";":
@@ -173,6 +181,7 @@ private:
 				break;
 			case "#":
 				ensureSimpleTag(tag);
+				outputText(context);
 				define(context, content);
 				break;
 			case "@":
@@ -183,6 +192,7 @@ private:
 				ensureSimpleTag(tag);
 				break;
 			default:
+				outputText(context);
 				interpolate(context, content, tagOpen.length == 2);
 				break;
 			}
@@ -333,15 +343,17 @@ private:
 		}
 	}
 
-	void escaper(Context context, string content) {
-		if (content.length) {
-			if (options_.compress)
-			   content = compress(content, options_.compress);
-			content = content.replace("\r", "");
-		}
+	void text(Context context, string content) {
+		text_ ~= content;
+	}
 
-		if (content.length)
-			insert_.children ~= create!Output(Token(context.loc), create!Constant(Token(content, Token.LiteralKind.String, 0, 0, context.loc)));
+	void outputText(Context context) {
+		if (text_.length) {
+			auto text = ((options_.compress) ? compress(cast(string)text_, options_.compress).idup : text_.idup).replace("\r", "");
+			if (text.length)
+				insert_.children ~= create!Output(Token(context.loc), create!Constant(Token(text, Token.LiteralKind.String, 0, 0, context.loc)));
+			text_.length = 0;
+		}
 	}
 
 	Source source_;
@@ -352,6 +364,7 @@ private:
 	SourceManager* mgr_;
 	ParserOptions options_;
 
+	char[] text_;
 	string[] errors_;
 }
 

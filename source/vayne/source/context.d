@@ -40,8 +40,14 @@ class Context {
 		return source.buffer[cursor..$];
 	}
 
-	auto open(string tag, string content) {
+	void open(string tag, string content) {
 		opens_ ~= Open(loc, cursor, tag, content);
+	}
+
+	auto open() const {
+		if (opens_.length == 0)
+			throw new ContextException(loc, "unexpected '/' tag; no tag is open");
+		return opens_[$ - 1];
 	}
 
 	auto close() {
