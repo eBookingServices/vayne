@@ -34,6 +34,10 @@ void bindLibBasic(ref Value[string] globals) {
 		return x.keys();
 	}
 
+	static Value values(Value x) {
+		return x.values();
+	}
+
 	static Value front(Value x) {
 		return x[0];
 	}
@@ -101,6 +105,7 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["length"] = Value(&length);
 	globals["empty"] = Value(&empty);
 	globals["keys"] = Value(&keys);
+	globals["values"] = Value(&values);
 	globals["front"] = Value(&front);
 	globals["back"] = Value(&back);
 

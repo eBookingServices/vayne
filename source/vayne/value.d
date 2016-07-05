@@ -580,6 +580,26 @@ struct Value {
 		}
 	}
 
+	ref auto values() const {
+		final switch (type) with (Type) {
+		case Null:
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case Function:
+		case Pointer:
+			throw new Exception(format("values not allowed for type %s", type));
+		case String:
+		case Array:
+			return this;
+		case AssocArray:
+			return Value(storage_.aa.values);
+		case Object:
+			return Value(storage_.o.values);
+		}
+	}
+
 	bool has(in Value index) const {
 		final switch (type) with (Type) {
 		case Null:
