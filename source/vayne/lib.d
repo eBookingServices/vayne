@@ -102,6 +102,10 @@ void bindLibBasic(ref Value[string] globals) {
 		return args[0].get!string;
 	}
 
+	static string replace(string x, string from, string to) {
+		return x.replace(from, to);
+	}
+
 	globals["length"] = Value(&length);
 	globals["empty"] = Value(&empty);
 	globals["keys"] = Value(&keys);
@@ -118,6 +122,8 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["default"] = Value(&def);
 
 	globals["escape"] = Value(&escape);
+
+	globals["replace"] = Value(&replace);
 
 	globals["__escape"] = Value(&escape);
 	globals["__translate"] = Value(&translate);
