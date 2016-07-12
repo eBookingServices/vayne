@@ -152,7 +152,31 @@ void bindLibMath(ref Value[string] globals) {
 		}
 	}
 
+	static Value min(Value[] args) {
+		size_t argMin;
+
+		foreach (i; 1..args.length) {
+			if (args[argMin].compareOp!">"(args[i]))
+				argMin = i;
+		}
+
+		return args[argMin];
+	}
+
+	static Value max(Value[] args) {
+		size_t argMax;
+
+		foreach (i; 1..args.length) {
+			if (args[argMax].compareOp!"<"(args[i]))
+				argMax = i;
+		}
+
+		return args[argMax];
+	}
+
 	globals["abs"] = Value(&abs);
+	globals["min"] = Value(&min);
+	globals["max"] = Value(&max);
 }
 
 

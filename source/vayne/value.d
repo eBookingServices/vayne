@@ -284,9 +284,6 @@ struct Value {
 	}
 
 	auto compareOp(string op)(in Value other) const {
-		if (type != other.type)
-			throw new Exception(format("compare op '%s' not allowed between types %s and %s", op, type, other.type));
-
 		final switch (type) with (Type) {
 		case Null:
 		case Undefined:
@@ -294,8 +291,17 @@ struct Value {
 		case Bool:
 			return mixin("(storage_.l != 0)" ~ op ~ "(other.storage_.l != 0)");
 		case Integer:
+			if (other.type == Integer)
+				return mixin("storage_.l " ~ op ~ " other.storage_.l");
+			if (other.type == Float)
+				return mixin("storage_.l " ~ op ~ " other.storage_.d");
+			break;
 		case Float:
-			return mixin("storage_.l" ~ op ~ "other.storage_.l");
+			if (other.type == Float)
+				return mixin("storage_.d " ~ op ~ " other.storage_.d");
+			if (other.type == Integer)
+				return mixin("storage_.d " ~ op ~ " other.storage_.l");
+			break;
 		case String:
 			return mixin("storage_.s" ~ op ~ "other.storage_.s");
 		case Function:
@@ -308,6 +314,10 @@ struct Value {
 		case Object:
 			throw new Exception(format("compare op '%s' not allowed for type %s", op, type));
 		}
+
+		if (type != other.type)
+			throw new Exception(format("compare op '%s' not allowed between types %s and %s", op, type, other.type));
+		throw new Exception(format("compare op '%s' not allowed for type %s", op, type));
 	}
 
 	auto concatOp(in Value other) const {
