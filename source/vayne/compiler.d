@@ -99,7 +99,7 @@ CompiledCode compile(string fileName, CompilerOptions options) {
 
 		if (options.constPrint) {
 			foreach (i, k; emitter.constants)
-				writeln(format("%4d %-16s %s", i, k.type, k.value));
+				writeln(format("%5d %-16s %s", i, k.type, k.value));
 		}
 
 		if (options.instrPrint || options.byteCodePrint) {
