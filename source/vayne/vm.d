@@ -322,7 +322,10 @@ struct VM(uint options = VMOptions.Default) {
 					errorHandler_(Error(e.msg, sources_[loc.id], loc.line));
 					break;
 				} else {
-					throw new VMException(e.msg, sources_[loc.id], loc.line);
+					auto rethrow = new VMException(e.msg, sources_[loc.id], loc.line);
+					rethrow.info = e.info;
+
+					throw rethrow;
 				}
 			}
 		}
