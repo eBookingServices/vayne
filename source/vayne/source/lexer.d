@@ -122,6 +122,14 @@ private:
 							current_ = Token(name, Token.KeywordKind.Def, 0, loc_);
 							return;
 						}
+						if (name == "set") {
+							current_ = Token(name, Token.KeywordKind.Set, 0, loc_);
+							return;
+						}
+						if (name == "pop") {
+							current_ = Token(name, Token.KeywordKind.Pop, 0, loc_);
+							return;
+						}
 						break;
 					case 4:
 						if (name == "null") {
@@ -130,6 +138,10 @@ private:
 						}
 						if (name == "true") {
 							current_ = Token(name, Token.KeywordKind.True, 0, loc_);
+							return;
+						}
+						if (name == "push") {
+							current_ = Token(name, Token.KeywordKind.Push, 0, loc_);
 							return;
 						}
 						break;

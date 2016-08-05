@@ -146,7 +146,7 @@ private:
 
 	string define(string content, Context context) {
 		auto lex = Lexer(Source(source_.id, source_.parent, content[1..$].strip));
-		auto tok = expect(lex, context, Token.KeywordKind.Def, Token.KeywordKind.Undef, Token.Kind.Identifier, "/");
+		auto tok = expect(lex, context, Token.KeywordKind.Def, Token.KeywordKind.Undef, Token.KeywordKind.Push, Token.KeywordKind.Pop, Token.KeywordKind.Set, Token.Kind.Identifier, "/");
 
 		if (tok.keyword(Token.KeywordKind.Def)) {
 			auto def = parseDef(lex, context);
@@ -178,6 +178,17 @@ private:
 			} else {
 				throw new PreParserException(context.loc, format("trying to undefine unknown macro '%s'", name));
 			}
+		} else if (tok.keyword(Token.KeywordKind.Set) || tok.keyword(Token.KeywordKind.Push)) {
+			auto name = expect(lex, context, Token.Kind.Identifier);
+			auto value = expect(lex, context, Token.Kind.Literal, Token.KeywordKind.True, Token.KeywordKind.False);
+			expect(lex, context, Token.Kind.EndOfInput);
+
+			return "{{" ~ content ~ "}}";
+		} else if (tok.keyword(Token.KeywordKind.Pop)) {
+			auto name = expect(lex, context, Token.Kind.Identifier);
+			expect(lex, context, Token.Kind.EndOfInput);
+
+			return "{{" ~ content ~ "}}";
 		} else if (tok.ident) {
 			if (!def_)
 				return expand(lex, context, tok.value);

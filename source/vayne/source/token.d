@@ -26,6 +26,9 @@ struct Token {
 		In,
 		Def,
 		Undef,
+		Set,
+		Push,
+		Pop,
 		As,
 	}
 

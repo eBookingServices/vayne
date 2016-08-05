@@ -53,6 +53,8 @@ private struct Parser {
 		source_ = mgr.get(id);
 		mgr_ = &mgr;
 		options_ = options;
+
+		settings_.init("compress", (options.compress != CompressOptions.none).to!string);
 	}
 
 	Node opCall() {
@@ -299,7 +301,38 @@ private:
 	}
 
 	void define(Context context, string content) {
-		//insert_.children ~= new Output(Token(context.loc), parseExpr(Source(source_.id, source_.parent, content), context.loc));
+		auto lex = Lexer(Source(source_.id, source_.parent, content[1..$].strip));
+		auto tok = lex.front;
+		lex.popFront;
+
+		switch (tok.kindKeyword) with (Token.KeywordKind) {
+		case Set:
+			auto name = lex.front;
+			lex.popFront;
+
+			auto value = lex.front;
+			lex.popFront;
+
+			settings_.set(context, name.value, value.value);
+			break;
+		case Push:
+			auto name = lex.front;
+			lex.popFront;
+
+			auto value = lex.front;
+			lex.popFront;
+
+			settings_.push(context, name.value, value.value);
+			break;
+		case Pop:
+			auto name = lex.front;
+			lex.popFront;
+
+			settings_.pop(context, name.value);
+			break;
+		default:
+			throw new ParserException(context.loc, format("unknown compile-time operation '%s'", tok.kindKeyword));
+		}
 	}
 
 	void withs(Context context, string content) {
@@ -349,7 +382,8 @@ private:
 
 	void outputText(Context context) {
 		if (text_.length) {
-			auto text = ((options_.compress) ? compress(cast(string)text_, options_.compress).idup : text_.idup).replace("\r", "");
+			auto compressionEnabled = settings_.get!bool(context, "compress");
+			auto text = (compressionEnabled ? compress(cast(string)text_, options_.compress).idup : text_.idup).replace("\r", "");
 			if (text.length)
 				insert_.children ~= create!Output(Token(context.loc), create!Constant(Token(text, Token.LiteralKind.String, 0, 0, context.loc)));
 			text_.length = 0;
@@ -364,8 +398,72 @@ private:
 	SourceManager* mgr_;
 	ParserOptions options_;
 
+	ParserSettingsStack settings_;
+
 	char[] text_;
 	string[] errors_;
+}
+
+
+@property bool isFalsy(string x) {
+	return (x.empty || (x == "0") || (x.toLower == "no") || (x.toLower == "false"));
+}
+
+
+@property bool isTruthy(string x) {
+	return !x.isFalsy;
+}
+
+
+struct ParserSettingsStack {
+	auto get(T)(Context context, string name) {
+		if (auto pstack = name in stack_) {
+			static if (is(Unqual!T == bool)) {
+				return (*pstack).back.isTruthy;
+			} else {
+				return (*pstack).back.to!T;
+			}
+		}
+
+		throw new ParserException(context.loc, format("unknown compile-time setting '%s'", name));
+	}
+
+	void init(string name, string value) {
+		stack_[name] = [ value ];
+	}
+
+	void set(Context context, string name, string value) {
+		if (auto pstack = name in stack_) {
+			(*pstack).back = value;
+			return;
+		}
+
+		throw new ParserException(context.loc, format("unknown compile-time setting '%s'", name));
+	}
+
+	void push(Context context, string name, string value) {
+		if (auto pstack = name in stack_) {
+			*pstack ~= value;
+			return;
+		}
+
+		throw new ParserException(context.loc, format("unknown compile-time setting '%s'", name));
+	}
+
+	void pop(Context context, string name) {
+		if (auto pstack = name in stack_) {
+			if (pstack.length > 1) {
+				(*pstack).popBack;
+				return;
+			} else {
+				throw new ParserException(context.loc, format("compile-time setting stack underflow for '%s'", name));
+			}
+		}
+
+		throw new ParserException(context.loc, format("unknown compile-time setting '%s'", name));
+	}
+
+	private string[][string] stack_;
 }
 
 

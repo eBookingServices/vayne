@@ -139,8 +139,11 @@ private:
 			case Null:
 				return constant(ConstantSlot.Type.Null, "null");
 			case In:
+			case Set:
 			case Def:
 			case Undef:
+			case Push:
+			case Pop:
 			case As:
 				assert(false, "unimplemented keyword kind constant " ~ node.tok.kindKeyword);
 			}
