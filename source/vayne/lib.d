@@ -75,6 +75,33 @@ void bindLibBasic(ref Value[string] globals) {
 		return x.get!bool;
 	}
 
+	static string type(Value x) {
+		final switch (x.type) with (Value.Type) {
+		case Undefined:
+			return "undefined";
+		case Null:
+			return "null";
+		case Bool:
+			return "bool";
+		case Integer:
+			return "integer";
+		case Float:
+			return "float";
+		case Function:
+			return "function";
+		case String:
+			return "string";
+		case Array:
+			return "array";
+		case AssocArray:
+			return "assocarray";
+		case Object:
+			return "object";
+		case Pointer:
+			return "pointer";
+		}
+	}
+
 	static string escape(Value[] args) {
 		auto value = args[0].get!string;
 
@@ -117,6 +144,7 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["float"] = Value(&tofloat);
 	globals["string"] = Value(&tostring);
 	globals["bool"] = Value(&tobool);
+	globals["type"] = Value(&type);
 
 	globals["get"] = Value(&get);
 	globals["default"] = Value(&def);
