@@ -284,24 +284,26 @@ struct Value {
 	}
 
 	auto compareOp(string op)(in Value other) const {
+		if (type != other.type) {
+			if ((type == Type.Integer) && (other.type == Type.Float)) {
+				return mixin("storage_.l " ~ op ~ " other.storage_.d");
+			} else if ((type == Type.Float) && (other.type == Type.Integer)) {
+				return mixin("storage_.d " ~ op ~ " other.storage_.l");
+			}
+
+			throw new Exception(format("compare op '%s' not allowed between types %s and %s", op, type, other.type));
+		}
+
 		final switch (type) with (Type) {
 		case Null:
 		case Undefined:
 			return true;
 		case Bool:
-			return mixin("(storage_.l != 0)" ~ op ~ "(other.storage_.l != 0)");
+			return mixin("storage_.b" ~ op ~ "other.storage_.b");
 		case Integer:
-			if (other.type == Integer)
-				return mixin("storage_.l " ~ op ~ " other.storage_.l");
-			if (other.type == Float)
-				return mixin("storage_.l " ~ op ~ " other.storage_.d");
-			break;
+			return mixin("storage_.l " ~ op ~ " other.storage_.l");
 		case Float:
-			if (other.type == Float)
-				return mixin("storage_.d " ~ op ~ " other.storage_.d");
-			if (other.type == Integer)
-				return mixin("storage_.d " ~ op ~ " other.storage_.l");
-			break;
+			return mixin("storage_.d " ~ op ~ " other.storage_.d");
 		case String:
 			return mixin("storage_.s" ~ op ~ "other.storage_.s");
 		case Function:
@@ -312,11 +314,9 @@ struct Value {
 			return mixin("storage_.p" ~ op ~ "other.storage_.p");
 		case AssocArray:
 		case Object:
-			throw new Exception(format("compare op '%s' not allowed for type %s", op, type));
+			break;
 		}
 
-		if (type != other.type)
-			throw new Exception(format("compare op '%s' not allowed between types %s and %s", op, type, other.type));
 		throw new Exception(format("compare op '%s' not allowed for type %s", op, type));
 	}
 
@@ -327,21 +327,22 @@ struct Value {
 	}
 
 	auto binaryOp(string op)(Value other) {
+		if (type != other.type) {
+			if ((type == Type.Integer) && (other.type == Type.Float)) {
+				return Value(mixin("storage_.l " ~ op ~ " other.storage_.d"));
+			} else if ((type == Type.Float) && (other.type == Type.Integer)) {
+				return Value(mixin("storage_.d " ~ op ~ " other.storage_.l"));
+			}
+			throw new Exception(format("binary op '%s' not allowed between types %s and %s", op, type, other.type));
+		}
+
 		final switch (type) with (Type) {
 		case Bool:
 			return Value(mixin("storage_.b " ~ op ~ " other.storage_.b"));
 		case Integer:
-			if (other.type == Integer)
-				return Value(mixin("storage_.l " ~ op ~ " other.storage_.l"));
-			if (other.type == Float)
-				return Value(mixin("storage_.l " ~ op ~ " other.storage_.d"));
-			break;
+			return Value(mixin("storage_.l " ~ op ~ " other.storage_.l"));
 		case Float:
-			if (other.type == Float)
-				return Value(mixin("storage_.d " ~ op ~ " other.storage_.d"));
-			if (other.type == Integer)
-				return Value(mixin("storage_.d " ~ op ~ " other.storage_.l"));
-			break;
+			return Value(mixin("storage_.d " ~ op ~ " other.storage_.d"));
 		case Null:
 		case Undefined:
 		case String:
@@ -353,8 +354,6 @@ struct Value {
 			break;
 		}
 
-		if (type != other.type)
-			throw new Exception(format("binary op '%s' not allowed between types %s and %s", op, type, other.type));
 		throw new Exception(format("binary op '%s' not allowed for type %s", op, type));
 	}
 
