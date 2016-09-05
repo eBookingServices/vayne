@@ -487,8 +487,9 @@ private:
 
 
 private @property bool isAllWhite(R)(R range) {
+	import std.uni : isWhite;
 	foreach (ch; range) {
-		if (!std.uni.isWhite(ch))
+		if (!isWhite(ch))
 			return false;
 	}
 	return true;
