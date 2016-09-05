@@ -241,6 +241,10 @@ void bindLibString(ref Value[string] globals) {
 		return x.get!string.toUpper();
 	}
 
+	static string capitalize(Value x) {
+		return x.get!string.capitalize();
+	}
+
 	static long indexOf(Value[] args) {
 		auto haystack = args[0].get!string;
 		auto needle = args[1].get!string;
@@ -298,6 +302,7 @@ void bindLibString(ref Value[string] globals) {
 	globals["strip"] = Value(&strip);
 	globals["lower"] = Value(&lower);
 	globals["upper"] = Value(&upper);
+	globals["capitalize"] = Value(&capitalize);
 	globals["indexOf"] = Value(&indexOf);
 }
 
