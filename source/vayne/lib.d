@@ -26,6 +26,14 @@ void bindLibBasic(ref Value[string] globals) {
 		return cast(long)x.length;
 	}
 
+	static bool existsIn(Value[] args) {
+		auto value = args[0].get!string;
+		foreach (f; args[1..$])
+			if(value == f.get!string)
+				return true;
+		return false;
+	}
+
 	static bool empty(Value x) {
 		return x.length == 0;
 	}
@@ -152,6 +160,7 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["escape"] = Value(&escape);
 
 	globals["replace"] = Value(&replace);
+	globals["existsIn"] = Value(&existsIn);
 
 	globals["__escape"] = Value(&escape);
 	globals["__translate"] = Value(&translate);
