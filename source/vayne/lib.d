@@ -155,6 +155,7 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["type"] = Value(&type);
 
 	globals["get"] = Value(&get);
+	globals["has"] = Value((Value x, Value key) => x.has(key));
 	globals["default"] = Value(&def);
 
 	globals["escape"] = Value(&escape);
