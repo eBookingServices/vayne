@@ -4,6 +4,7 @@ module vayne.value;
 import std.algorithm;
 import std.array;
 import std.conv;
+import std.datetime;
 import std.format;
 import std.meta;
 import std.range;
@@ -565,6 +566,24 @@ struct Value {
 		case Pointer:
 			throw new Exception(format("cannot convert %s to function", type));
 		case Function:
+			return cast(T)storage_.f;
+		}
+	}
+
+	T get(T)() const if (is(Unqual!T == Date)) {
+		final switch (type) with (Type) {
+		case Null:
+		case Undefined:
+		case Bool:
+		case Integer:
+		case Float:
+		case String:
+		case Array:
+		case AssocArray:
+		case Pointer:
+		case Function:
+			throw new Exception(format("cannot convert %s to date", type));
+		case Object:
 			return cast(T)storage_.f;
 		}
 	}
