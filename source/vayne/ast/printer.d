@@ -54,11 +54,13 @@ class Printer(Appender) : Visitor {
 	}
 
 	override void visit(ConditionalExpression node) {
+		app.put("(");
 		node.children[0].accept(this);
-		app.put("?");
+		app.put(" ? ");
 		node.children[1].accept(this);
-		app.put(":");
+		app.put(" : ");
 		node.children[2].accept(this);
+		app.put(")");
 	}
 
 	override void visit(IndexOp node) {
