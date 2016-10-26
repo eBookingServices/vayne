@@ -160,13 +160,17 @@ private:
 		debug mixin(Guard);
 
 		auto expr = emitExpression(node.children[0]);
+		scope(exit) release(expr);
+
 		switch (node.tok.name) {
 		case "-":
-			auto target = registerize(node.tok.loc, expr);
+			auto target = register();
+			emit(OpCode.Move, node.tok.loc, target, expr);
 			emit(OpCode.Minus, node.tok.loc, target);
 			return target;
 		case "!":
-			auto target = registerize(node.tok.loc, expr);
+			auto target = register();
+			emit(OpCode.Move, node.tok.loc, target, expr);
 			emit(OpCode.Not, node.tok.loc, target);
 			return target;
 		case "+":
