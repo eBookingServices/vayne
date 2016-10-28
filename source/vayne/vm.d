@@ -36,7 +36,7 @@ private template isWriterObject(T) {
 }
 
 
-struct VM(uint options = VMOptions.Default) {
+struct VM(uint options = VMOptions.Default, uint registerCountMax = 0) {
 	static struct Error {
 		string msg;
 		string source;
@@ -51,7 +51,12 @@ struct VM(uint options = VMOptions.Default) {
 		sources_ = sources;
 		consts_ = constants;
 
-		regs_.length = registers;
+		static if (registerCountMax > 0) {
+			if (registers > registerCountMax)
+				throw new Exception(format("not enough pre-allocated registers %d > %d", registers, registerCountMax));
+		} else {
+			regs_.length = registers;
+		}
 	}
 
 	void load(size_t registers, size_t constants, const(Instr)[] instrs, const(SourceLoc)[] locs, const(string)[] sources) {
@@ -59,8 +64,14 @@ struct VM(uint options = VMOptions.Default) {
 		locs_ = locs;
 		sources_ = sources;
 
-		regs_.length = registers;
 		consts_.length = constants;
+
+		static if (registerCountMax > 0) {
+			if (registers > registerCountMax)
+				throw new Exception(format("not enough pre-allocated registers %d > %d", registers, registerCountMax));
+		} else {
+			regs_.length = registers;
+		}
 	}
 
 	void bindConst(T)(size_t index, ref T value) if (is(T == struct)) {
@@ -333,7 +344,13 @@ struct VM(uint options = VMOptions.Default) {
 
 private:
 	Value[] consts_;
-	Value[] regs_;
+
+	static if (registerCountMax > 0) {
+		Value[registerCountMax] regs_;
+	} else {
+		Value[] regs_;
+	}
+
 	Globals globals_;
 	Value[] scopes_;
 	bool dispatchArg_;
