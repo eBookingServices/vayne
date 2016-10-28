@@ -579,12 +579,13 @@ struct Value {
 		case Float:
 		case String:
 		case Array:
-		case AssocArray:
 		case Pointer:
 		case Function:
 			throw new Exception(format("cannot convert %s to date", type));
 		case Object:
-			return cast(T)storage_.o;
+			return Date(storage_.o["year"], storage_.o["month"], storage_.o["day"]);
+		case AssocArray:
+			return Date(storage_.aa["year"], storage_.aa["month"], storage_.aa["day"]);
 		}
 	}
 
