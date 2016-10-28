@@ -584,7 +584,7 @@ struct Value {
 		case Function:
 			throw new Exception(format("cannot convert %s to date", type));
 		case Object:
-			return cast(T)storage_.f;
+			return cast(T)storage_.o;
 		}
 	}
 
