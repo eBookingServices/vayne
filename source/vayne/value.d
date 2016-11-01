@@ -212,7 +212,7 @@ struct Value {
 		}
 	}
 
-	private void bindMembers(T)(auto ref T x) {
+	private void bindMembers(T)(ref T x) {
 		foreach (Member; FieldNameTuple!T) {
 			static if ((Member != "") && (__traits(getProtection, __traits(getMember, x, Member)) == "public") && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
 				static if (hasUDA!(__traits(getMember, x, Member), NameAttribute)) {
@@ -233,27 +233,33 @@ struct Value {
 
 		foreach (Member; __traits(derivedMembers, T)) {
 			enum callable = !NotCallableNames.canFind(Member);
+			enum getMember = "&(*cast(Unqual!(typeof(x))*)&x)." ~ Member;
 
 			static if (is(FunctionTypeOf!(__traits(getMember, T, Member))) && (__traits(getProtection, __traits(getMember, x, Member)) == "public") && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
-				static if (callable && isCompatibleFunction!(typeof(&__traits(getMember, x, Member)))) {
-					enum bindable = !NotBindableNames.canFind(Member);
+				static if (is(typeof(() { auto a = mixin(getMember); }))) {
+					alias MemberType = typeof(mixin(getMember));
+					static if (callable && isCompatibleFunction!MemberType) {
+						enum bindable = !NotBindableNames.canFind(Member);
 
-					alias Args = ParameterTypeTuple!(typeof(&__traits(getMember, x, Member)));
+						alias Args = ParameterTypeTuple!MemberType;
 
-					static if (hasUDA!(__traits(getMember, x, Member), NameAttribute)) {
-						enum name = getUDAs!(__traits(getMember, x, Member), NameAttribute)[0].name;
-					} else {
-						enum name = Member;
-					}
+						auto addr = mixin(getMember);
 
-					static if (bindable) {
-						storage_.o[name] = Value(&__traits(getMember, x, Member));
-					}
+						static if (hasUDA!(__traits(getMember, x, Member), NameAttribute)) {
+							enum name = getUDAs!(__traits(getMember, x, Member), NameAttribute)[0].name;
+						} else {
+							enum name = Member;
+						}
 
-					static if ((Member == "toString") && (Args.length == 0)) {
-						storage_.o["__tostring"] = Value(&__traits(getMember, x, Member));
-					} else static if ((Member == "opIndex")) {
-						//storage_.o["__index"] = Value(&__traits(getMember, x, Member));
+						static if (bindable) {
+							storage_.o[name] = Value(addr);
+						}
+
+						static if ((Member == "toString") && (Args.length == 0)) {
+							storage_.o["__tostring"] = Value(addr);
+						} else static if ((Member == "opIndex")) {
+							//storage_.o["__index"] = Value(addr);
+						}
 					}
 				}
 			}
