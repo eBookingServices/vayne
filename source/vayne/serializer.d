@@ -13,53 +13,55 @@ import vayne.source.source;
 const(ubyte)[] serialize(CompiledCode code) {
 	ByteStreamWriter writer;
 
-	with (writer) {
-		put!uint(MagicString);
-		put!uint(FormatVersion);
-		put!uint(OpCodesVersion);
-		put!uint(code.registerCount);
+	void put(T)(T x) {
+		writer.put!T(x);
+	}
 
-		if (code.constants.length) {
-			put!ubyte(Chunks.Constants);
-			put!uint(cast(uint)code.constants.length);
-			foreach (i, k; code.constants) {
-				put!ubyte(k.type);
-				put!string(k.value);
-			}
-		}
+	put!uint(MagicString);
+	put!uint(FormatVersion);
+	put!uint(OpCodesVersion);
+	put!uint(code.registerCount);
 
-		if (code.instrs.length) {
-			put!ubyte(Chunks.Instructions);
-			put!uint(cast(uint)code.instrs.length);
-			foreach (instr; code.instrs) {
-				put!ulong(instr.code0);
-				put!ulong(instr.code1);
-			}
+	if (code.constants.length) {
+		put!ubyte(Chunks.Constants);
+		put!uint(cast(uint)code.constants.length);
+		foreach (i, k; code.constants) {
+			put!ubyte(k.type);
+			put!string(k.value);
 		}
+	}
 
-		if (code.locs.length) {
-			put!ubyte(Chunks.InstructionSourceLocations);
-			put!uint(cast(uint)code.locs.length);
-			foreach (loc; code.locs) {
-				put!uint(loc.id);
-				put!uint(loc.line);
-				//writer.put!uint(loc.column);
-			}
+	if (code.instrs.length) {
+		put!ubyte(Chunks.Instructions);
+		put!uint(cast(uint)code.instrs.length);
+		foreach (instr; code.instrs) {
+			put!ulong(instr.code0);
+			put!ulong(instr.code1);
 		}
+	}
 
-		if (code.sources.length) {
-			put!ubyte(Chunks.SourceNames);
-			put!uint(cast(uint)code.sources.length);
-			foreach (source; code.sources)
-				put!string(source);
+	if (code.locs.length) {
+		put!ubyte(Chunks.InstructionSourceLocations);
+		put!uint(cast(uint)code.locs.length);
+		foreach (loc; code.locs) {
+			put!uint(loc.id);
+			put!uint(loc.line);
+			//writer.put!uint(loc.column);
 		}
+	}
 
-		if (false && code.dependencies.length) {
-			put!ubyte(Chunks.Dependencies);
-			put!uint(cast(uint)code.dependencies.length);
-			foreach (dependency; code.dependencies)
-				put!string(dependency);
-		}
+	if (code.sources.length) {
+		put!ubyte(Chunks.SourceNames);
+		put!uint(cast(uint)code.sources.length);
+		foreach (source; code.sources)
+			put!string(source);
+	}
+
+	if (false && code.dependencies.length) {
+		put!ubyte(Chunks.Dependencies);
+		put!uint(cast(uint)code.dependencies.length);
+		foreach (dependency; code.dependencies)
+			put!string(dependency);
 	}
 
 	return writer.data;
@@ -68,66 +70,69 @@ const(ubyte)[] serialize(CompiledCode code) {
 
 CompiledCode unserialize(const(ubyte)[] bytes) {
 	auto reader = ByteStreamReader(bytes);
+
+	auto take(T)() {
+		return reader.take!T;
+	}
+
 	CompiledCode result;
 
-	with (reader) {
-		auto magic = take!uint;
-		auto format = take!uint;
-		auto opcodes = take!uint;
-		result.registerCount = take!uint;
+	auto magic = take!uint;
+	auto format = take!uint;
+	auto opcodes = take!uint;
+	result.registerCount = take!uint;
 
-		assert(magic == MagicString);
-		assert(format == FormatVersion);
-		assert(opcodes == OpCodesVersion);
+	assert(magic == MagicString);
+	assert(format == FormatVersion);
+	assert(opcodes == OpCodesVersion);
 
-		while (!eos) {
-			auto chunk = take!ubyte;
-			final switch (cast(Chunks)chunk) with (Chunks) {
-			case Instructions:
-				assert(result.instrs.empty);
-				auto count = take!uint;
-				result.instrs.reserve(count);
-				foreach (i; 0..count) {
-					auto code0 = take!ulong;
-					auto code1 = take!ulong;
-					result.instrs ~= Instr(code0, code1);
-				}
-				break;
-			case Constants:
-				assert(result.constants.empty);
-				auto count = take!uint;
-				result.constants.reserve(count);
-				foreach (i; 0..count) {
-					auto type = cast(ConstantType)take!ubyte;
-					auto value = take!string;
-					result.constants ~= CompiledCode.Constant(type, value);
-				}
-				break;
-			case InstructionSourceLocations:
-				assert(result.locs.empty);
-				auto count = take!uint;
-				result.locs.reserve(count);
-				foreach (i; 0..count) {
-					auto source = take!uint;
-					auto line = take!uint;
-					result.locs ~= SourceLoc(source, line, 0);
-				}
-				break;
-			case SourceNames:
-				assert(result.sources.empty);
-				auto count = take!uint;
-				result.sources.reserve(count);
-				foreach (i; 0..count)
-					result.sources ~= take!string;
-				break;
-			case Dependencies:
-				assert(result.dependencies.empty);
-				auto count = take!uint;
-				result.dependencies.reserve(count);
-				foreach (i; 0..count)
-					result.dependencies ~= take!string;
-				break;
+	while (!reader.eos) {
+		auto chunk = take!ubyte;
+		final switch (cast(Chunks)chunk) with (Chunks) {
+		case Instructions:
+			assert(result.instrs.empty);
+			auto count = take!uint;
+			result.instrs.reserve(count);
+			foreach (i; 0..count) {
+				auto code0 = take!ulong;
+				auto code1 = take!ulong;
+				result.instrs ~= Instr(code0, code1);
 			}
+			break;
+		case Constants:
+			assert(result.constants.empty);
+			auto count = take!uint;
+			result.constants.reserve(count);
+			foreach (i; 0..count) {
+				auto type = cast(ConstantType)take!ubyte;
+				auto value = take!string;
+				result.constants ~= CompiledCode.Constant(type, value);
+			}
+			break;
+		case InstructionSourceLocations:
+			assert(result.locs.empty);
+			auto count = take!uint;
+			result.locs.reserve(count);
+			foreach (i; 0..count) {
+				auto source = take!uint;
+				auto line = take!uint;
+				result.locs ~= SourceLoc(source, line, 0);
+			}
+			break;
+		case SourceNames:
+			assert(result.sources.empty);
+			auto count = take!uint;
+			result.sources.reserve(count);
+			foreach (i; 0..count)
+				result.sources ~= take!string;
+			break;
+		case Dependencies:
+			assert(result.dependencies.empty);
+			auto count = take!uint;
+			result.dependencies.reserve(count);
+			foreach (i; 0..count)
+				result.dependencies ~= take!string;
+			break;
 		}
 	}
 
@@ -148,45 +153,42 @@ enum Chunks : ubyte {
 
 enum : uint { MagicString = 0xBB9D1BC5 };
 enum : uint { FormatVersion = 1 };
-
+enum : uint { ExtendSize = 32 * 1024 }
 
 
 struct ByteStreamWriter {
 	void put(T)(T x) if (isIntegral!T) {
-		if (offset_ + T.sizeof > stream_.length)
-			stream_.length += 16 * 1024;
+		if ((offset_ + T.sizeof) > stream_.length)
+			stream_.length += ExtendSize;
 		// TODO: always write as little-endian
 		*cast(T*)(stream_.ptr + offset_) = x;
-		length_ += T.sizeof;
 		offset_ += T.sizeof;
 	}
 
 	void put(T)(T x) if (is(Unqual!T == string)) {
 		auto req = offset_ + uint.sizeof + x.length;
 		if (req > stream_.length) {
-			auto len = stream_.length + 16 * 1024;
+			auto len = stream_.length + ExtendSize;
 			while (req >= len)
-				len += 16 * 1024;
+				len += ExtendSize;
 			stream_.length = len;
 		}
 
 		put!uint(cast(uint)x.length);
 
 		(cast(char*)stream_.ptr)[offset_..offset_ + x.length] = x[];
-		length_ += x.length;
 		offset_ += x.length;
 	}
 
 	@property size_t length() const {
-		return length_;
+		return offset_;
 	}
 
 	@property const(ubyte)[] data() const {
-		return stream_[0..length_];
+		return stream_[0..offset_];
 	}
 
 	private ubyte[] stream_;
-	private size_t length_;
 	private size_t offset_;
 }
 
