@@ -13,6 +13,9 @@ import std.traits;
 import std.stdio;
 
 
+import vayne.hash;
+
+
 private struct IgnoreAttribute {}
 private struct NameAttribute { const(char)[] name; }
 
@@ -396,26 +399,26 @@ struct Value {
 			try {
 				final switch (type) with (Type) {
 				case Integer:
-					return storage_.l.hashOf;
+					return vayne.hash.hashOf(storage_.l);
 				case Float:
-					return storage_.d.hashOf;
+					return vayne.hash.hashOf(storage_.d);
 				case Null:
 				case Undefined:
 					return 0;
 				case Bool:
-					return storage_.b.hashOf;
+					return vayne.hash.hashOf(storage_.b);
 				case String:
-					return storage_.s.hashOf;
+					return vayne.hash.hashOf(storage_.s);
 				case Function:
-					return storage_.f.hashOf;
+					return vayne.hash.hashOf(storage_.f);
 				case Array:
-					return storage_.a.hashOf;
+					return vayne.hash.hashOf(storage_.a);
 				case AssocArray:
-					return storage_.aa.hashOf;
+					return vayne.hash.hashOf(storage_.aa);
 				case Object:
-					return storage_.o.hashOf;
+					return vayne.hash.hashOf(storage_.o);
 				case Pointer:
-					return storage_.p.hashOf;
+					return vayne.hash.hashOf(storage_.p);
 				}
 			} catch (Exception e) {
 				return 0;
