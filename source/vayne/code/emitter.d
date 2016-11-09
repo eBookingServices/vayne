@@ -310,9 +310,12 @@ private:
 	auto emitConditionalExpression(ConditionalExpression node) {
 		debug mixin(Guard);
 
-		auto target = registerize(node.tok.loc, emitExpression(node.children[0]));
+		auto target = register();
 
-		emit(OpCode.Test, node.tok.loc, target, target);
+		auto cond = emitExpression(node.children[0]);
+		scope(exit) release(cond);
+
+		emit(OpCode.Test, node.tok.loc, target, cond);
 		auto jz = placeholder(node.tok.loc);
 
 		auto trueCase = emitExpression(node.children[1]);
