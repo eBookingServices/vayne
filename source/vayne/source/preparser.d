@@ -86,7 +86,7 @@ private:
 			auto indexOpen = remaining.indexOf("{{");
 			while (indexOpen != -1) {
 				auto tag = remaining[indexOpen + 2..indexOpen + 2 + 1];
-				if ((tag == "#") || (tag == "&"))
+				if ((tag == "#") || (tag == "&") || (tag == "!"))
 					break;
 				indexOpen = remaining.indexOf("{{", indexOpen + 2);
 			}
@@ -99,13 +99,6 @@ private:
 
 			const contentStart = indexOpen + 2;
 			auto indexClose = remaining.indexOf("}}", contentStart);
-			while (indexClose != -1) {
-				if (balancedQuotes(remaining[contentStart..indexClose]))
-					break;
-
-				indexClose = remaining.indexOf("}}", indexClose + 2);
-			}
-
 			if (indexClose == -1)
 				throw new PreParserException(context.loc, "missing '}}' to close tag '{{'");
 
@@ -345,6 +338,8 @@ private:
 		if (content.length > 0) {
 			auto tag = content[0];
 			switch(tag) {
+			case '!':
+				return null;
 			case '&':
 				return include(content, context).strip;
 			case '#':
