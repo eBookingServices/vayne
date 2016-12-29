@@ -7,6 +7,7 @@ import std.conv;
 import std.format;
 import std.string;
 import std.utf;
+import std.regex;
 
 
 import vayne.value;
@@ -139,6 +140,10 @@ void bindLibBasic(ref Value[string] globals) {
 
 	static string replace(string x, string from, string to) {
 		return x.replace(from, to);
+	}
+
+	static string replaceAll(string x, string from, string to) {
+		return x.replaceAll(regex(from), to);
 	}
 
 	globals["length"] = Value(&length);
