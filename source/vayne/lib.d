@@ -166,6 +166,7 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["escape"] = Value(&escape);
 
 	globals["replace"] = Value(&replace);
+	globals["replaceAll"] = Value(&replaceAll);
 	globals["existsIn"] = Value(&existsIn);
 
 	globals["__escape"] = Value(&escape);
