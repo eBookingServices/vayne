@@ -262,11 +262,22 @@ void bindLibString(ref Value[string] globals) {
 	}
 
 	static long indexOf(Value[] args) {
-		auto haystack = args[0].get!string;
-		auto needle = args[1].get!string;
-		auto start = (args.length > 2) ? args[2].get!size_t : 0;
+		if (!args[0].length)
+			return -1;
 
-		return haystack.indexOf(needle, start);
+		if (args[0].type == Value.Type.String) {
+			auto haystack = args[0].get!string;
+			auto needle = args[1].get!string;
+			auto start = (args.length > 2) ? args[2].get!size_t : 0;
+			return haystack.indexOf(needle, start);
+		}
+
+		foreach (size_t i, v; args[0]) {
+			if (v.compareOp!"=="(args[1]))
+				return cast(long)i;
+		}
+
+		return -1;
 	}
 
 	static string format(Value[] args) {
