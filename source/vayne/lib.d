@@ -288,7 +288,7 @@ void bindLibString(ref Value[string] globals) {
 		app.reserve(max(32, fmt.length + fmt.length >> 1));
 
 		size_t arg = 1;
-    	while (spec.writeUpToNextSpec(&app)) {
+    	while (spec.writeUpToNextSpec(app)) {
 			if (arg >= args.length)
 				break;
 
