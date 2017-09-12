@@ -111,6 +111,11 @@ void bindLibBasic(ref Value[string] globals) {
 		}
 	}
 
+	static bool exists(Value x) {
+		// Json objects also have a type property that is not a string, so in the case our Value is also a Json we have to convert it to string first.
+		return x.type.to!string != "undefined";
+	}
+
 	static string escape(Value[] args) {
 		auto value = args[0].get!string;
 
