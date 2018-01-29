@@ -69,6 +69,8 @@ struct Emitter {
 
 		foreach (child; node.children)
 			emitStatement(child);
+		if (!instrs_.empty)
+			emit(OpCode.Nop, locs_.back);
 
 		assert(scopes_.empty);
 		assert(!registers_ || reduce!((a, b) => a + b)(0, refs_) == 0);
