@@ -67,5 +67,4 @@ private __gshared {
 	auto tagSpacesEndLastQuote = regex(`"=\s*[a-z0-9-_]+$"`, "i");
 	auto tagQuotes = regex(`\s*=\s*(["'])([a-z0-9-_]+?)\1(/?)(?=[^<]*?>)`, "i");
 	auto tagSurround = regex(`\s*(</?(?:html|head|link|script|style|body|br|p|div|center|dl|form|hr|ol|ul|table|tbody|tr|td|th|tfoot|thead)(?:>|[\s/][^>]*>))\s*`, "i");
-	auto tagInterSpace = regex(`>\s+<`, "i");
 }
