@@ -647,7 +647,7 @@ struct Value {
 		case Float:
 		case Function:
 		case Pointer:
-			throw new Exception(format("indexing not allowed for type %s", type));
+			throw new Exception(format("indexing not allowed for type %s, key '%s'", type, index));
 		case String:
 			auto i = index.get!ulong;
 			return i < length;
@@ -672,7 +672,7 @@ struct Value {
 		case Float:
 		case Function:
 		case Pointer:
-			throw new Exception(format("indexing not allowed for type %s", type));
+			throw new Exception(format("indexing not allowed for type %s, key '%s'", type, index));
 		case String:
 			auto i = index.get!size_t;
 			if (i < length) {
@@ -713,17 +713,17 @@ struct Value {
 		case Float:
 		case Function:
 		case Pointer:
-			throw new Exception(format("indexing not allowed for type %s", type));
+			throw new Exception(format("indexing not allowed for type %s, key '%s'", type, index));
 		case String:
 			auto i = index.get!size_t;
 			if (i < length)
 				return Value(storage_.s[i..i + 1]);
-			throw new Exception("out of range");
+			throw new Exception(format("out of range index %d for length %d", i, length));
 		case Array:
 			auto i = index.get!size_t;
 			if (i < length)
 				return (cast(Value*)storage_.a)[i];
-			throw new Exception("out of range");
+			throw new Exception(format("out of range index %d for length %d", i, length));
 		case AssocArray:
 			auto i = index;
 			if (auto pvalue = i in storage_.aa)
@@ -746,11 +746,11 @@ struct Value {
 		case Float:
 		case Function:
 		case Pointer:
-			throw new Exception(format("indexing not allowed for type %s", type));
+			throw new Exception(format("indexing not allowed for type %s, key '%s'", type, index));
 		case String:
-			throw new Exception(format("indexing with string key not allowed for type %s", type));
+			throw new Exception(format("indexing with string key not allowed for type %s, key '%s'", type, index));
 		case Array:
-			throw new Exception(format("indexing with string key not allowed for type %s", type));
+			throw new Exception(format("indexing with string key not allowed for type %s, key '%s'", type, index));
 		case AssocArray:
 			auto i = Value(index);
 			if (auto pvalue = i in storage_.aa)
@@ -772,17 +772,17 @@ struct Value {
 		case Float:
 		case Function:
 		case Pointer:
-			throw new Exception(format("indexing not allowed for type %s", type));
+			throw new Exception(format("indexing not allowed for type %s, key '%s'", type, index));
 		case Object:
-			throw new Exception(format("indexing with integer key not allowed for type %s", type));
+			throw new Exception(format("indexing with integer key not allowed for type %s, key '%s'", type, index));
 		case String:
-			if (auto i = index < length)
+			if (index < length)
 				return Value(storage_.s[index..index + 1]);
-			throw new Exception("out of range");
+			throw new Exception(format("out of range index %d for length %d", index, length));
 		case Array:
 			if (index < length)
 				return (cast(Value*)storage_.a)[index];
-			throw new Exception("out of range");
+			throw new Exception(format("out of range index %d for length %d", index, length));
 		case AssocArray:
 			if (auto pvalue = Value(index) in storage_.aa)
 				return *pvalue;
@@ -799,11 +799,11 @@ struct Value {
 		case Float:
 		case Function:
 		case Pointer:
-			throw new Exception(format("index assign not allowed for type %s", type));
+			throw new Exception(format("index assign not allowed for type %s, key '%s'", type, index));
 		case String:
-			throw new Exception(format("index assign with string key not allowed for type %s", type));
+			throw new Exception(format("index assign with string key not allowed for type %s, key '%s'", type, index));
 		case Array:
-			throw new Exception(format("index assign with string key not allowed for type %s", type));
+			throw new Exception(format("index assign with string key not allowed for type %s, key '%s'", type, index));
 		case AssocArray:
 			storage_.aa[Value(index)] = value;
 			break;
@@ -823,15 +823,15 @@ struct Value {
 		case Function:
 		case String:
 		case Pointer:
-			throw new Exception(format("index assign not allowed for type %s", type));
+			throw new Exception(format("index assign not allowed for type %s, key '%s'", type, index));
 		case Object:
-			throw new Exception(format("index assign with integer key not allowed for type %s", type));
+			throw new Exception(format("index assign with integer key not allowed for type %s, key '%s'", type, index));
 		case Array:
 			if (index < length) {
 				storage_.a[index] = value;
 				break;
 			}
-			throw new Exception("out of range");
+			throw new Exception(format("out of range index %d for length %d", index, length));
 		case AssocArray:
 			storage_.aa[Value(index)] = value;
 			break;

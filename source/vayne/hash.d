@@ -199,9 +199,9 @@ ulong hash64(T)(in const(T)* x, size_t len, ulong seed = 0) if (__traits(isArith
 	}
 
 	h ^= h >> 33;
-	h *= Prime32_2;
+	h *= Prime64_2;
 	h ^= h >> 29;
-	h *= Prime32_3;
+	h *= Prime64_3;
 	h ^= h >> 32;
 	return h;
 }

@@ -328,16 +328,11 @@ struct VM(uint options = VMOptions.Default, uint registerCountMax = 0) {
 					break;
 				instr = instrs_.ptr[ip];
 			} catch (Throwable e) {
-				string error = e.msg;
-				string source;
-				size_t line;
-				if (ip >= 0 && ip < locs_.length) {
-					auto loc = locs_[ip];
-					source = sources_[loc.id];
-					line = loc.line;
-				} else {
-					error = "Vayne error: Unable to get line number from vayne template? Original error: " ~ e.msg;
-				}
+				auto loc = locs_[ip];
+				auto error = e.msg;
+				auto source = sources_[loc.id];
+				auto line = loc.line;
+
 				if (errorHandler_) {
 					errorHandler_(Error(error, source, line));
 					break;
