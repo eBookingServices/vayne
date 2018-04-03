@@ -217,7 +217,7 @@ struct Value {
 
 	private void bindMembers(T)(ref T x) {
 		foreach (Member; FieldNameTuple!T) {
-			static if ((Member != "") && (__traits(getProtection, __traits(getMember, x, Member)) == "public") && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
+			static if (Member != "" && is(typeof(__traits(getMember, x, Member))) && __traits(getProtection, __traits(getMember, x, Member)) == "public" && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
 				static if (hasUDA!(__traits(getMember, x, Member), NameAttribute)) {
 					enum name = getUDAs!(__traits(getMember, x, Member), NameAttribute)[0].name;
 				} else {
