@@ -40,7 +40,11 @@ private template isCompatibleStorageClass(size_t Class) {
 
 
 private template isCompatibleArgType(T) {
-	enum isCompatibleArgType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || (isArray!T && is(Unqual!(typeof(T.init[0])) == Value)) || (isAssociativeArray!T && is(Unqual!(KeyType!T) == Value) && is(Unqual!(ValueType!T) == Value)));
+	static if (is(T == enum)) {
+		enum isCompatibleArgType = isCompatibleArgType!(OriginalType!T);
+	} else {
+		enum isCompatibleArgType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || (isArray!T && is(Unqual!(typeof(T.init[0])) == Value)) || (isAssociativeArray!T && is(Unqual!(KeyType!T) == Value) && is(Unqual!(ValueType!T) == Value)));
+	}
 }
 
 
@@ -126,7 +130,7 @@ struct Value {
 		storage_ = x.storage_;
 	}
 
-	this(T)(in T x) if (isBoolean!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isBoolean!T) {
 		type_ = Type.Bool;
 		storage_.b = x;
 	}
@@ -146,7 +150,7 @@ struct Value {
 		storage_.s = x;
 	}
 
-	this(T)(in T x) if (isArray!T && !isSomeString!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isArray!T && !isSomeString!T) {
 		type_ = Type.Array;
 		static if (!is(Unqual!(ElementType!T) == Value)) {
 			auto arr = uninitializedArray!(Value[])(x.length);
@@ -158,7 +162,7 @@ struct Value {
 		}
 	}
 
-	this(T)(T x) if (isSomeFunction!T && isCompatibleFunction!T) {
+	this(T)(T x) if (!is(Unqual!T == enum) && isSomeFunction!T && isCompatibleFunction!T) {
 		if (x !is null) {
 			type_ = Type.Function;
 			static if (isFunctionPointer!T) {
@@ -173,23 +177,23 @@ struct Value {
 		}
 	}
 
-	this(T)(in T x) if (isAssociativeArray!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isAssociativeArray!T) {
 		type_ = Type.AssocArray;
 		foreach (ref k, ref v; x)
 			storage_.aa[Value(k)] = Value(v);
 	}
 
-	this(T)(in T x) if (is(Unqual!T == enum)) {
-		alias BaseType = Unqual!(OriginalType!T);
-		this(cast(BaseType)x);
-	}
-
-	this(T)(in T x) if (isPointer!T && !isSomeFunction!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isPointer!T && !isSomeFunction!T) {
 		if (x !is null) {
 			this(*x); // TODO: cyclic refs?
 		} else {
 			this(null);
 		}
+	}
+
+	this(T)(in T x) if (is(Unqual!T == enum)) {
+		alias BaseType = Unqual!(OriginalType!T);
+		this(cast(BaseType)x);
 	}
 
 	// struct have to be bound by ref because methods/delegates might otherwise point to garbage memory
