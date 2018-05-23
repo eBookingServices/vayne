@@ -43,14 +43,14 @@ private template isCompatibleArgType(T) {
 	static if (is(T == enum)) {
 		enum isCompatibleArgType = isCompatibleArgType!(OriginalType!T);
 	} else {
-		enum isCompatibleArgType = !isSomeFunction!T && (isScalarType!T || isSomeString!T || isBoolean!T || is(Unqual!T == Value) || (isArray!T && is(Unqual!(typeof(T.init[0])) == Value)) || (isAssociativeArray!T && is(Unqual!(KeyType!T) == Value) && is(Unqual!(ValueType!T) == Value)));
+		enum isCompatibleArgType = !isSomeFunction!T && (isScalarType!T || isSomeString!(OriginalType!T) || isBoolean!T || is(Unqual!T == Value) || (isArray!T && is(Unqual!(typeof(T.init[0])) == Value)) || (isAssociativeArray!T && is(Unqual!(KeyType!T) == Value) && is(Unqual!(ValueType!T) == Value)));
 	}
 }
 
 
 private template isCompatibleReturnType(F) {
 	alias R = ReturnType!F;
-	enum isCompatibleReturnType = !isSomeFunction!R && (isScalarType!R || isSomeString!R || isBoolean!R || is(Unqual!R == Value) || isArray!R  || isAssociativeArray!R || is(R == class) || is(R == interface) || (is(R == struct) && ((functionAttributes!F & FunctionAttribute.ref_) != 0)));
+	enum isCompatibleReturnType = !isSomeFunction!R && (isScalarType!R || isSomeString!(OriginalType!R) || isBoolean!R || is(Unqual!R == Value) || isArray!R  || isAssociativeArray!R || is(R == class) || is(R == interface) || (is(R == struct) && ((functionAttributes!F & FunctionAttribute.ref_) != 0)));
 }
 
 
@@ -145,12 +145,12 @@ struct Value {
 		storage_.d = cast(double)x;
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isSomeString!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isSomeString!(OriginalType!T)) {
 		type_ = Type.String;
 		storage_.s = x;
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isArray!T && !isSomeString!T) {
+	this(T)(in T x) if (!is(Unqual!T == enum) && isArray!T && !isSomeString!(OriginalType!T)) {
 		type_ = Type.Array;
 		static if (!is(Unqual!(ElementType!T) == Value)) {
 			auto arr = uninitializedArray!(Value[])(x.length);
@@ -474,7 +474,7 @@ struct Value {
 		return this;
 	}
 
-	T get(T)() const if (isSomeString!T) {
+	T get(T)() const if (isSomeString!(OriginalType!T)) {
 		final switch (type) with (Type) {
 		case Undefined:
 		case Null:

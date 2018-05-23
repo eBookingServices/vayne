@@ -365,11 +365,11 @@ private:
 		lex.popFront;
 
 		foreach(i, Arg; Args) {
-			static assert(is(Arg == Token) || isSomeString!Arg || is(Arg == Token.Kind) || is(Arg == Token.KeywordKind));
+			static assert(is(Arg == Token) || isSomeString!(OriginalType!Arg) || is(Arg == Token.Kind) || is(Arg == Token.KeywordKind));
 			static if (is(Arg == Token)) {
 				if (tok != args[i])
 					continue;
-			} else static if (isSomeString!Arg) {
+			} else static if (isSomeString!(OriginalType!Arg)) {
 				if ((tok.kind != Token.Kind.Separator) || (tok.value != args[i]))
 					continue;
 			} else static if (is(Arg == Token.Kind)) {
@@ -397,11 +397,11 @@ private:
 		lex.popFront;
 
 		foreach(i, Arg; Args) {
-			static assert(is(Arg == Token) || isSomeString!Arg || is(Arg == Token.Kind) || is(Arg == Token.KeywordKind));
+			static assert(is(Arg == Token) || isSomeString!(OriginalType!Arg) || is(Arg == Token.Kind) || is(Arg == Token.KeywordKind));
 			static if (is(Arg == Token)) {
 				if (tok == args[i])
 					return tok;
-			} else static if (isSomeString!Arg) {
+			} else static if (isSomeString!(OriginalType!Arg)) {
 				if ((tok.kind == Token.Kind.Separator) && (tok.value == args[i]))
 					return tok;
 			} else static if (is(Arg == Token.Kind)) {
