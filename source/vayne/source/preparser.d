@@ -15,6 +15,7 @@ import vayne.source.token;
 
 struct PreParserOptions {
 	bool lineNumbers;
+	bool verboseIncludes;
 }
 
 
@@ -134,6 +135,9 @@ private:
 
 		if (needsLineNumbers(result))
 			result ~= sourceInfo(context.loc);
+
+		if (needsIncludeNames())
+			result =  format("<!-- begin include %s -->%s<!-- end include %s -->", content, result, content);
 		return result;
 	}
 
@@ -277,6 +281,9 @@ private:
 					auto result = parse(source, SourceLoc(source.id, pdef.loc.line, pdef.loc.column));
 					if (needsLineNumbers(result))
 						result ~= sourceInfo(context.loc);
+
+					if (needsIncludeNames())
+						result = format("<!-- begin macro #%s -->%s<!-- end macro #%s -->", name, result, name);
 					return result;
 				}
 			}
@@ -353,6 +360,10 @@ private:
 
 	auto needsLineNumbers(string content) const {
 		return options_.lineNumbers && !isAllWhite(content);
+	}
+
+	auto needsIncludeNames() {
+		return options_.verboseIncludes;
 	}
 
 	string sourceInfo(SourceLoc loc) {

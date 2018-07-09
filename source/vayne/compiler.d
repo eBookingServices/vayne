@@ -27,6 +27,7 @@ struct CompilerOptions {
 	auto constPrint = false;
 	auto lineNumbers = true;
 	auto compress = false;
+	auto verboseIncludes = false;
 
 	string[] search;
 	string ext = ".html";
@@ -81,7 +82,7 @@ CompiledCode compile(string fileName, CompilerOptions options) {
 
 		PreParserOptions preOptions;
 		preOptions.lineNumbers = options.lineNumbers;
-
+		preOptions.verboseIncludes = options.verboseIncludes;
 		mgr.set(src.id, preparse(mgr, src.id, preOptions));
 
 		if (options.preparsePrint)
