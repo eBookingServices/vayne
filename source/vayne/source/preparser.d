@@ -282,7 +282,7 @@ private:
 					if (needsLineNumbers(result))
 						result ~= sourceInfo(context.loc);
 
-					if (needsIncludeNames)
+					if (needsIncludeNames())
 						result = format("<!-- begin macro #%s -->%s<!-- end macro #%s -->", name, result, name);
 					return result;
 				}
