@@ -125,44 +125,49 @@ struct Value {
 		type_ = Type.Null;
 	}
 
-	this(in Value x) {
+	this(Value x) {
 		type_ = x.type_;
 		storage_ = x.storage_;
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isBoolean!T) {
+	this(T)(T x) if (isBoolean!T) {
 		type_ = Type.Bool;
 		storage_.b = x;
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isScalarType!T && !isBoolean!T && !isFloatingPoint!T) {
+	this(T)(T x) if (isScalarType!T && !isBoolean!T && !isFloatingPoint!T) {
 		type_ = Type.Integer;
 		storage_.l = cast(long)x;
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isScalarType!T && !isBoolean!T && isFloatingPoint!T) {
+	this(T)(T x) if (isScalarType!T && !isBoolean!T && isFloatingPoint!T) {
 		type_ = Type.Float;
 		storage_.d = cast(double)x;
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isSomeString!(OriginalType!T)) {
+	this(T)(T x) if (isSomeString!(OriginalType!T)) {
 		type_ = Type.String;
 		storage_.s = x;
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isArray!T && !isSomeString!(OriginalType!T)) {
+	this(T)(T x) if (isArray!T && !isSomeString!(OriginalType!T)) {
 		type_ = Type.Array;
 		static if (!is(Unqual!(ElementType!T) == Value)) {
 			auto arr = uninitializedArray!(Value[])(x.length);
-			foreach (i, ref v; x)
-				arr[i] = Value(v);
+			static if (is(Unqual!(ElementType!T) == void)) {
+				foreach (i, ref v; cast(ubyte[])x)
+					arr[i] = Value(v);
+			} else {
+				foreach (i, ref v; x)
+					arr[i] = Value(v);
+			}
 			storage_.a = arr;
 		} else {
 			storage_.a = cast(Value[])x;
 		}
 	}
 
-	this(T)(T x) if (!is(Unqual!T == enum) && isSomeFunction!T && isCompatibleFunction!T) {
+	this(T)(T x) if (isSomeFunction!T && isCompatibleFunction!T) {
 		if (x !is null) {
 			type_ = Type.Function;
 			static if (isFunctionPointer!T) {
@@ -177,23 +182,19 @@ struct Value {
 		}
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isAssociativeArray!T) {
+	this(T)(T x) if (isAssociativeArray!T) {
 		type_ = Type.AssocArray;
 		foreach (ref k, ref v; x)
 			storage_.aa[Value(k)] = Value(v);
 	}
 
-	this(T)(in T x) if (!is(Unqual!T == enum) && isPointer!T && !isSomeFunction!T) {
+	this(T)(T x) if (isPointer!T && !isSomeFunction!T) {
 		if (x !is null) {
-			this(*x); // TODO: cyclic refs?
+			type_ = Type.Pointer;
+			storage_.p = cast(void*)x;
 		} else {
-			this(null);
+			type_ = Type.Null;
 		}
-	}
-
-	this(T)(in T x) if (is(Unqual!T == enum)) {
-		alias BaseType = Unqual!(OriginalType!T);
-		this(cast(BaseType)x);
 	}
 
 	// struct have to be bound by ref because methods/delegates might otherwise point to garbage memory
@@ -512,7 +513,7 @@ struct Value {
 		case String:
 			return storage_.s.to!T;
 		case Pointer:
-			return cast(T)storage_.p;
+			return cast(T)(cast(size_t)storage_.p);
 		case Null:
 		case Undefined:
 		case Function:
