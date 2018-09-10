@@ -189,11 +189,15 @@ struct Value {
 	}
 
 	this(T)(T x) if (isPointer!T && !isSomeFunction!T) {
-		if (x !is null) {
+		static if (is(Unqual!(PointerTarget!T) == void) || isPointer!(PointerTarget!T)) {
 			type_ = Type.Pointer;
 			storage_.p = cast(void*)x;
 		} else {
-			type_ = Type.Null;
+			if (x is null) {
+				this(null);
+			} else {
+				this(*x);
+			}
 		}
 	}
 
