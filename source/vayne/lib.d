@@ -55,6 +55,10 @@ void bindLibBasic(ref Value[string] globals) {
 		return x[x.length - 1];
 	}
 
+	static Value take(Value x, Value y) {
+		return x[0..min(x.length, y.get!long)];
+	}
+
 	static Value get(Value x, Value key, Value def) {
 		Value result;
 		if (x.has(key, &result))
@@ -157,6 +161,7 @@ void bindLibBasic(ref Value[string] globals) {
 	globals["values"] = Value(&values);
 	globals["front"] = Value(&front);
 	globals["back"] = Value(&back);
+	globals["take"] = Value(&take);
 
 	globals["integer"] = Value(&tointeger);
 	globals["float"] = Value(&tofloat);
