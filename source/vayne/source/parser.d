@@ -251,7 +251,8 @@ private:
 		}
 
 		auto ifStmt = cast(IfStatement)insert_.children.back;
-		assert(ifStmt !is null);
+		if (ifStmt is null)
+			ifStmt = create!IfStatement(Token(context.loc), null, create!StatementBlock(Token(context.loc)), null);
 
 		while (ifStmt.children[2] !is null) {
 			ifStmt = cast(IfStatement)ifStmt.children[2];
