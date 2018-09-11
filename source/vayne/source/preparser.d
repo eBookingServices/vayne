@@ -116,7 +116,7 @@ private:
 		app.put((context.cursor > 0) ? context.remaining() : context.source.buffer);
 
 		if (needsLineNumbers(app.data))
-			return sourceInfo(loc) ~ app.data;
+			return sourceInfo(context.loc) ~ app.data;
 		return app.data;
 	}
 
@@ -137,7 +137,7 @@ private:
 			result ~= sourceInfo(context.loc);
 
 		if (needsIncludeNames())
-			result =  format("<!-- begin include %s -->%s<!-- end include %s -->", content, result, content);
+			result = format("<!-- begin include %s -->%s<!-- end include %s -->", content, result, content);
 		return result;
 	}
 
