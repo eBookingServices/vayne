@@ -50,7 +50,7 @@ private template isCompatibleArgType(T) {
 
 private template isCompatibleReturnType(F) {
 	alias R = ReturnType!F;
-	enum isCompatibleReturnType = !isSomeFunction!R && (isScalarType!R || isSomeString!(OriginalType!R) || isBoolean!R || is(Unqual!R == Value) || isArray!R  || isAssociativeArray!R || is(R == class) || is(R == interface) || (is(R == struct) && ((functionAttributes!F & FunctionAttribute.ref_) != 0)));
+	enum isCompatibleReturnType = !isSomeFunction!R && ((isScalarType!R || isSomeString!(OriginalType!R) || isBoolean!R || is(Unqual!R == Value) || isArray!R || isAssociativeArray!R || is(R == class) || is(R == interface) || is(R == struct)));
 }
 
 
@@ -201,13 +201,18 @@ struct Value {
 		}
 	}
 
-	// struct have to be bound by ref because methods/delegates might otherwise point to garbage memory
-	this(T)(ref T x) if (is(Unqual!T == struct)) {
+	this(T)(auto ref T x) if (is(Unqual!T == struct)) {
 		static if (is(Unqual!(typeof(x.toVayneValue())) == Value)) {
 			this = x.toVayneValue();
 		} else {
 			type_ = Type.Object;
-			bindMembers(x);
+			static if (__traits(isRef, x)) {
+				bindMembers(x);
+			} else {
+				// struct have to be bound by ref because methods/delegates
+				// might otherwise point to garbage memory
+				bindMembers(*(new T) = x);
+			}
 		}
 	}
 
