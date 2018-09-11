@@ -9,8 +9,7 @@ import std.format;
 import std.meta;
 import std.range;
 import std.traits;
-
-import std.stdio;
+import std.typecons;
 
 
 import vayne.hash;
@@ -188,6 +187,14 @@ struct Value {
 			storage_.aa[Value(k)] = Value(v);
 	}
 
+	this(T)(auto ref T x) if (isInstanceOf!(Nullable, T) || isInstanceOf!(NullableRef, T)) {
+		if (x.isNull) {
+			this(null);
+		} else {
+			this(x.get);
+		}
+	}
+
 	this(T)(T x) if (isPointer!T && !isSomeFunction!T) {
 		static if (is(Unqual!(PointerTarget!T) == void) || isPointer!(PointerTarget!T)) {
 			type_ = Type.Pointer;
@@ -201,7 +208,7 @@ struct Value {
 		}
 	}
 
-	this(T)(auto ref T x) if (is(Unqual!T == struct)) {
+	this(T)(auto ref T x) if (is(Unqual!T == struct) && !(isInstanceOf!(Nullable, T) || isInstanceOf!(NullableRef, T))) {
 		static if (is(Unqual!(typeof(x.toVayneValue())) == Value)) {
 			this = x.toVayneValue();
 		} else {
