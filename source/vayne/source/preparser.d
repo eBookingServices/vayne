@@ -94,7 +94,8 @@ private:
 			if (indexOpen == -1)
 				break;
 
-			if (!def_)
+			auto inComment = context.isOpen && (context.open().tag == "!!");
+			if (!def_ && !inComment)
 				app.put(remaining[0..indexOpen]);
 			context.advance(indexOpen);
 
@@ -107,7 +108,7 @@ private:
 			indexClose -= contentStart;
 
 			auto replaced = replacer(context.source.buffer[context.cursor..context.cursor + indexClose], context);
-			if (!def_)
+			if (!def_ && !inComment)
 				app.put(replaced);
 			context.advance(indexClose + 2);
 		}
@@ -139,6 +140,19 @@ private:
 		if (needsIncludeNames())
 			result = format("<!-- begin include %s -->%s<!-- end include %s -->", content, result, content);
 		return result;
+	}
+
+	string comment(string content, Context context) {
+		auto block = ((content.length > 1) && (content[1] == content[0])) ? 1 : 0;
+		if (block) {
+			if ((content.length == 2) || (content[2] != '/')) {
+				context.open(content[0..2], content[2..$]);
+			} else if ((content.length > 2) && (content[2] == '/')) {
+				context.expectOpen("!!", "!!/");
+				context.close();
+			}
+		}
+		return null;
 	}
 
 	string define(string content, Context context) {
@@ -346,7 +360,7 @@ private:
 			auto tag = content[0];
 			switch(tag) {
 			case '!':
-				return null;
+				return comment(content, context);
 			case '&':
 				return include(content, context).strip;
 			case '#':

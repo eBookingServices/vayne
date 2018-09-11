@@ -44,9 +44,13 @@ class Context {
 		opens_ ~= Open(loc, cursor, tag, content);
 	}
 
+	auto isOpen() const {
+		return opens_.length > 0;
+	}
+
 	auto open() const {
 		if (opens_.length == 0)
-			throw new ContextException(loc, "unexpected '/' tag; no tag is open");
+			throw new ContextException(loc, "no tag is open");
 		return opens_[$ - 1];
 	}
 
