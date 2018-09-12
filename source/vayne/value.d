@@ -49,12 +49,18 @@ private template isCompatibleArgType(T) {
 
 private template isCompatibleReturnType(F) {
 	alias R = ReturnType!F;
-	enum isCompatibleReturnType = !isSomeFunction!R && ((isScalarType!R || isSomeString!(OriginalType!R) || isBoolean!R || is(Unqual!R == Value) || isArray!R || isAssociativeArray!R || is(R == class) || is(R == interface) || is(R == struct)));
+	enum isCompatibleReturnType = !isSomeFunction!R && ((isScalarType!R || isSomeString!(OriginalType!R) || isBoolean!R || is(Unqual!R == Value) || isArray!R || isAssociativeArray!R || is(R == class) || is(R == interface) ||
+		(is(R == struct) && (
+			((functionAttributes!F & FunctionAttribute.ref_) != 0) ||
+			is(typeof({ auto x = new Unqual!R; *x = Unqual!R.init; }))
+		))
+	));
 }
 
 
 private template isCompatibleFunction(T) {
-	enum isCompatibleFunction = isCompatibleReturnType!T && allSatisfy!(isCompatibleArgType, ParameterTypeTuple!T) && allSatisfy!(isCompatibleStorageClass, ParameterStorageClassTuple!T);
+	enum isCompatibleFunction = isCompatibleReturnType!T && allSatisfy!(isCompatibleArgType, ParameterTypeTuple!T) && allSatisfy!(isCompatibleStorageClass, ParameterStorageClassTuple!T) &&
+		((functionAttributes!T & FunctionAttribute.inout_) == 0);
 }
 
 
@@ -97,10 +103,21 @@ private static void functionWrapper(T)(void* ptr, void* self, Value[] args, ref 
 		}
 	}
 
-	static if (is(ReturnType!T == void)) {
+	alias R = Unqual!(ReturnType!T);
+	static if (is(R == void)) {
 		func(argValues);
 	} else {
-		ret = Value(func(argValues));
+		static if (is(R == struct)) {
+			static if ((functionAttributes!T & FunctionAttribute.ref_) != 0) {
+				ret = Value(func(argValues));
+			} else {
+				auto nret = new R;
+				*nret = func(argValues);
+				ret = Value(nret);
+			}
+		} else {
+			ret = Value(func(argValues));
+		}
 	}
 }
 
@@ -208,18 +225,12 @@ struct Value {
 		}
 	}
 
-	this(T)(auto ref T x) if (is(Unqual!T == struct) && !(isInstanceOf!(Nullable, T) || isInstanceOf!(NullableRef, T))) {
+	this(T)(ref T x) if (is(Unqual!T == struct) && !(isInstanceOf!(Nullable, T) || isInstanceOf!(NullableRef, T))) {
 		static if (is(Unqual!(typeof(x.toVayneValue())) == Value)) {
 			this = x.toVayneValue();
 		} else {
 			type_ = Type.Object;
-			static if (__traits(isRef, x)) {
-				bindMembers(x);
-			} else {
-				// struct have to be bound by ref because methods/delegates
-				// might otherwise point to garbage memory
-				bindMembers(*(new T) = x);
-			}
+			bindMembers(x);
 		}
 	}
 
@@ -235,6 +246,7 @@ struct Value {
 			type_ = Type.Null;
 		}
 	}
+
 
 	private void bindMembers(T)(ref T x) {
 		foreach (Member; FieldNameTuple!T) {
@@ -256,12 +268,12 @@ struct Value {
 		}
 
 		foreach (Member; __traits(derivedMembers, T)) {
-			enum callable = !NotCallableNames.canFind(Member);
 			enum getMember = "&(*cast(Unqual!(typeof(x))*)&x)." ~ Member;
 
 			static if (is(FunctionTypeOf!(__traits(getMember, T, Member))) && (__traits(getProtection, __traits(getMember, x, Member)) == "public") && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
 				static if (is(typeof(() { auto a = mixin(getMember); }))) {
 					alias MemberType = typeof(mixin(getMember));
+					enum callable = !NotCallableNames.canFind(Member);
 					static if (callable && isCompatibleFunction!MemberType) {
 						enum bindable = !NotBindableNames.canFind(Member);
 
