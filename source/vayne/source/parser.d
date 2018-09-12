@@ -417,6 +417,7 @@ private:
 
 
 struct ParserSettingsStack {
+	import std.traits : Unqual;
 	auto get(T)(Context context, string name) {
 		if (auto pstack = name in stack_) {
 			static if (is(Unqual!T == bool)) {
@@ -673,11 +674,6 @@ private struct ExprParser {
 		default:
 			break;
 		}
-
-		return null;
-	}
-
-	Node parseArrayConstructor() {
 
 		return null;
 	}
