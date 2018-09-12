@@ -326,7 +326,7 @@ void bindLibString(ref Value[string] globals) {
 				formatValue(&app, value.get!double, spec);
 				break;
 			}
-    	}
+		}
 
 		if (arg != args.length)
 			throw new Exception(std.format.format("number of arguments doesn't match number of format specifiers - expected %d, got %d", arg - 1, args.length - 1));
@@ -355,24 +355,11 @@ string escapeHTML(string x) {
 	auto app = appender!string;
 	app.reserve(8 + x.length + (x.length >> 1));
 
-	foreach (ch; x.byDchar) {
+	foreach (dchar ch; x) {
 		switch (ch) {
 		case '"':
-			app.put("&quot;");
-			break;
-		case '\'':
-			app.put("&#39;");
-			break;
-		case 'a': .. case 'z':
-			goto case;
-		case 'A': .. case 'Z':
-			goto case;
-		case '0': .. case '9':
-			goto case;
-		case ' ', '\t', '\n', '\r', '-', '_', '.', ':', ',', ';',
-			'#', '+', '*', '?', '=', '(', ')', '/', '!',
-			'%' , '{', '}', '[', ']', '$', '^', '~':
-			app.put(cast(char)ch);
+			app.put("&#34;"); // shorter than &quot;
+			static assert('"' == 34);
 			break;
 		case '<':
 			app.put("&lt;");
@@ -384,7 +371,7 @@ string escapeHTML(string x) {
 			app.put("&amp;");
 			break;
 		default:
-			formattedWrite(&app, "&#x%02X;", cast(uint)ch);
+			app.put(ch);
 			break;
 		}
 	}
@@ -396,7 +383,7 @@ string escapeJS(string x) {
 	auto app = appender!string;
 	app.reserve(x.length + (x.length >> 1));
 
-	foreach (ch; x.byDchar) {
+	foreach (dchar ch; x) {
 		switch (ch) {
 		case '\\':
 			app.put(`\\`);
