@@ -358,8 +358,10 @@ string escapeHTML(string x) {
 	foreach (dchar ch; x) {
 		switch (ch) {
 		case '"':
-			app.put("&#34;"); // shorter than &quot;
-			static assert('"' == 34);
+			app.put("&#34;");
+			break;
+		case '\'':
+			app.put("&#39;");
 			break;
 		case '<':
 			app.put("&lt;");
