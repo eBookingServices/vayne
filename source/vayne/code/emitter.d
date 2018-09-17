@@ -67,6 +67,10 @@ struct Emitter {
 		assert(scopes_.empty);
 		assert(registers_ == 0);
 
+		instrs_.reserve(32768);
+		locs_.reserve(32768);
+		constants_.reserve(4096);
+
 		foreach (child; node.children)
 			emitStatement(child);
 		if (!instrs_.empty)

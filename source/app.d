@@ -22,10 +22,6 @@ const(string)[] compile(string fileName, string target, CompilerOptions options)
 
 
 int main(string[] args) {
-	version (linux) {
-		import etc.linux.memoryerror;
-		registerMemoryErrorHandler();
-	}
 
 	auto result = 0;
 	auto time = false;
@@ -52,12 +48,12 @@ int main(string[] args) {
 			"j|search",			"search path(s) to look for source files", &compileOptions.search,
 			"e|default-ext", 	"default source file extension (defaults to .html)", &compileOptions.ext);
 
-		if (opts.helpWanted || (args.length != 2)) {
-			defaultGetoptPrinter("Usage: vayne [OPTIONS] file\n", opts.options);
+		if (opts.helpWanted || (args.length < 2)) {
+			defaultGetoptPrinter("Usage: vayne [OPTIONS] file...\n", opts.options);
 			return 1;
 		}
 	} catch (Exception e) {
-		writeln(e.msg);
+		stderr.writeln(e.msg);
 		return 1;
 	}
 
@@ -66,82 +62,84 @@ int main(string[] args) {
 			outputDir = absolutePath(outputDir);
 	}
 
-	auto fileName = args[1];
-	if (verbose)
-		writeln("compiling ", fileName, "...");
+	auto fileNames = args[1..$];
+	foreach (fileName; fileNames) {
+		if (verbose)
+			writeln("compiling ", fileName, "...");
 
-	auto timeStart = Clock.currTime;
+		auto timeStart = Clock.currTime;
 
-	try {
-		auto target = buildNormalizedPath(outputDir, fileName ~ ".vayne");
+		try {
+			auto target = buildNormalizedPath(outputDir, fileName ~ ".vayne");
 
-		if (!outputDir.empty) {
-			try {
-				mkdirRecurse(target.dirName);
-			} catch(Throwable) {
-			}
-		}
-
-		auto deps = compile(fileName, target, compileOptions);
-
-		if (!depCacheDir.empty) {
-			immutable depsExtension = ".deps";
-
-			auto depsFileName = buildNormalizedPath(depCacheDir, fileName ~ depsExtension);
-			try {
-				mkdirRecurse(depsFileName.dirName);
-			} catch(Throwable) {
+			if (!outputDir.empty) {
+				try {
+					mkdirRecurse(target.dirName);
+				} catch(Throwable) {
+				}
 			}
 
-			if (!depCacheGenOnly) {
-				if (!isAbsolute(depCacheDir))
-					depCacheDir = absolutePath(depCacheDir);
+			auto deps = compile(fileName, target, compileOptions);
 
-				string[] dependants;
-				foreach (entry; dirEntries(depCacheDir, SpanMode.breadth)) {
-					if (!entry.isDir) {
-						if (entry.name.extension == depsExtension) {
-							foreach (depName; File(entry.name).byLine) {
-								if (depName == fileName)
-									dependants ~= relativePath(entry.name[0..$ - depsExtension.length], depCacheDir);
+			if (!depCacheDir.empty) {
+				immutable depsExtension = ".deps";
+
+				auto depsFileName = buildNormalizedPath(depCacheDir, fileName ~ depsExtension);
+				try {
+					mkdirRecurse(depsFileName.dirName);
+				} catch(Throwable) {
+				}
+
+				if (!depCacheGenOnly) {
+					if (!isAbsolute(depCacheDir))
+						depCacheDir = absolutePath(depCacheDir);
+
+					string[] dependants;
+					foreach (entry; dirEntries(depCacheDir, SpanMode.breadth)) {
+						if (!entry.isDir) {
+							if (entry.name.extension == depsExtension) {
+								foreach (depName; File(entry.name).byLine) {
+									if (depName == fileName)
+										dependants ~= relativePath(entry.name[0..$ - depsExtension.length], depCacheDir);
+								}
 							}
+						}
+					}
+
+					if (dependants.length) {
+						foreach(dependant; dependants) {
+							if (verbose)
+								writeln("compiling dependant ", dependant, "...");
+
+							compile(dependant, outputDir, compileOptions);
 						}
 					}
 				}
 
-				if (dependants.length) {
-					foreach(dependant; dependants) {
-						if (verbose)
-							writeln("compiling dependant ", dependant, "...");
-
-						compile(dependant, outputDir, compileOptions);
-					}
+				Appender!string appender;
+				appender.reserve(2 * 1024);
+				foreach (depName; deps) {
+					appender.put(depName);
+					appender.put("\n");
 				}
+
+				std.file.write(depsFileName, appender.data);
+			}
+		} catch (Exception error) {
+			if (auto compileErrors = cast(CompileErrorsException)error) {
+				foreach (msg; compileErrors.errors)
+					stderr.writeln("error: ", msg);
+			} else {
+				stderr.writeln("error: ", error.msg);
 			}
 
-			Appender!string appender;
-			appender.reserve(2 * 1024);
-			foreach (depName; deps) {
-				appender.put(depName);
-				appender.put("\n");
-			}
-
-			std.file.write(depsFileName, appender.data);
-		}
-	} catch (Exception error) {
-		if (auto compileErrors = cast(CompileErrorsException)error) {
-			foreach (msg; compileErrors.errors)
-				writeln("error: ", msg);
-		} else {
-			writeln("error: ", error.msg);
+			result = 1;
 		}
 
-		result = 1;
+		auto timeEnd = Clock.currTime;
+		if (time)
+			writeln(format("elapsed: %.1fms", (timeEnd - timeStart).total!"usecs" * 0.001f));
 	}
-
-	auto timeEnd = Clock.currTime;
-	if (time)
-		writeln(format("elapsed: %.1fms", (timeEnd - timeStart).total!"usecs" * 0.001f));
 
 	return result;
 }
