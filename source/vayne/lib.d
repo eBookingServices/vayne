@@ -122,6 +122,8 @@ void bindLibBasic(ref Value[string] globals) {
 
 	static string escape(Value[] args) {
 		auto value = args[0].get!string;
+		if (value.empty())
+			return null;
 
 		foreach (f; args[1..$]) {
 			switch (f.get!string) {
@@ -355,7 +357,7 @@ string escapeHTML(string x) {
 	auto app = appender!string;
 	app.reserve(8 + x.length + (x.length >> 1));
 
-	foreach (dchar ch; x) {
+	foreach (dchar ch; x.byDchar) {
 		switch (ch) {
 		case '"':
 			app.put("&#34;");
