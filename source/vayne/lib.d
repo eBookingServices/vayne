@@ -354,81 +354,147 @@ void bindLibDefault(ref Value[string] globals) {
 
 
 string escapeHTML(string x) {
-	auto app = appender!string;
-	app.reserve(8 + x.length + (x.length >> 1));
+	auto ptr = x.ptr;
+	const end = x.ptr + x.length;
 
-	foreach (dchar ch; x.byDchar) {
+	while (ptr != end) {
+		auto ch = *ptr++;
+		if (ch > '>') continue;
+
 		switch (ch) {
 		case '"':
-			app.put("&#34;");
-			break;
 		case '\'':
-			app.put("&#39;");
-			break;
 		case '<':
-			app.put("&lt;");
-			break;
 		case '>':
-			app.put("&gt;");
-			break;
 		case '&':
-			app.put("&amp;");
-			break;
+			const prefix = ptr - x.ptr - 1;
+
+			auto app = appender!string;
+			app.reserve(prefix + (x.length - prefix) * 2);
+			app.put(x.ptr[0..prefix]);
+			--ptr;
+
+			while (ptr != end) {
+				const pch = *ptr++;
+				switch (pch) {
+				case '"':
+					app.put("&#34;");
+					break;
+				case '\'':
+					app.put("&#39;");
+					break;
+				case '<':
+					app.put("&lt;");
+					break;
+				case '>':
+					app.put("&gt;");
+					break;
+				case '&':
+					app.put("&amp;");
+					break;
+				default:
+					app.put(pch);
+					break;
+				}
+			}
+			return app.data;
 		default:
-			app.put(ch);
-			break;
+			continue;
 		}
 	}
-	return app.data;
+	return x;
 }
 
 
 string escapeJS(string x) {
-	auto app = appender!string;
-	app.reserve(x.length + (x.length >> 1));
+	auto ptr = x.ptr;
+	const end = x.ptr + x.length;
 
-	foreach (dchar ch; x) {
+	while (ptr != end) {
+		auto ch = *ptr++;
+		if (ch > '\\') continue;
+
 		switch (ch) {
 		case '\\':
-			app.put(`\\`);
-			break;
 		case '\'':
-			app.put(`\'`);
-			break;
 		case '\"':
-			app.put(`\"`);
-			break;
 		case '\r':
-			break;
 		case '\n':
-			app.put(`\n`);
-			break;
+			const prefix = ptr - x.ptr - 1;
+
+			auto app = appender!string;
+			app.reserve(prefix + 1 + (x.length - prefix) + (x.length - prefix) / 2);
+			app.put(x.ptr[0..prefix]);
+			--ptr;
+
+			while (ptr != end) {
+				const pch = *ptr++;
+				switch (pch) {
+				case '\\':
+					app.put(`\\`);
+					break;
+				case '\'':
+					app.put(`\'`);
+					break;
+				case '\"':
+					app.put(`\"`);
+					break;
+				case '\r':
+					break;
+				case '\n':
+					app.put(`\n`);
+					break;
+				default:
+					app.put(pch);
+					break;
+				}
+			}
+			return app.data;
 		default:
-			app.put(ch);
-			break;
+			continue;
 		}
 	}
-	return app.data;
+	return x;
 }
 
 
 string escapeURI(string x) {
-	auto app = appender!string;
-	app.reserve(8 + x.length + (x.length >> 1));
+	auto ptr = x.ptr;
+	const end = x.ptr + x.length;
 
-	foreach (i; 0..x.length) {
-		switch (x.ptr[i]) {
+	while (ptr != end) {
+		auto ch = *ptr++;
+
+		switch (ch) {
 		case 'A': .. case 'Z':
 		case 'a': .. case 'z':
 		case '0': .. case '9':
 		case '-': case '_': case '.': case '~':
-			app.put(x.ptr[i]);
-			break;
+			continue;
 		default:
-			formattedWrite(&app, "%%%02X", x.ptr[i]);
-			break;
+			const prefix = ptr - x.ptr - 1;
+
+			auto app = appender!string;
+			app.reserve(prefix + 1 + (x.length - prefix) + (x.length - prefix) / 2);
+			app.put(x.ptr[0..prefix]);
+			--ptr;
+
+			while (ptr != end) {
+				const pch = *ptr++;
+				switch (pch) {
+				case 'A': .. case 'Z':
+				case 'a': .. case 'z':
+				case '0': .. case '9':
+				case '-': case '_': case '.': case '~':
+					app.put(pch);
+					break;
+				default:
+					formattedWrite(&app, "%%%02X", pch);
+					break;
+				}
+			}
+			return app.data;
 		}
 	}
-
-	return app.data;
+	return x;
 }
