@@ -26,14 +26,15 @@ string extensionMimeType(string ext) {
 	case ".tif":
 	case ".tiff":
 		return "image/tiff";
+	case ".webp":
+		return "image/webp";
 	case ".txt":
 		return "text/plain";
 	case ".html":
 		return "text/html";
 	default:
-		break;
+		return "application/octet-stream";
 	}
-	return null;
 }
 
 
