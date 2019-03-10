@@ -29,8 +29,9 @@ Compiles source text/html into bytecode to be interpreted at run time.
 
 
 #### Tags
-	{{& fileName }} - Include external file
-	{{&& fileName }} - Embed external file as mime-encoded content
+	{{& fileName }} - Include external template file
+	{{% fileName }} - Embed external raw file
+	{{%% fileName }} - Embed external file as mime-encoded content
 	{{* key, value; iterable }} {{key}} {{value}} {{/}} - Iterate any iteratable symbol
 	{{? expr }} true case {{: [expr] }} else case {{/}}
 	{{@ expr0, expr2 as ident }} - Create symbol scopes or named copy of expressions. For symbol scopes, expression must evalute to an object or associative array.

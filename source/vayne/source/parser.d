@@ -113,13 +113,14 @@ private:
 			context.advance(close.length);
 			indexClose -= contentStart;
 
+			auto content = source.buffer[context.cursor..context.cursor + indexClose];
+			context.advance(indexClose + close.length);
+
 			try {
-				compile(context, source.buffer[context.cursor..context.cursor + indexClose], open, close);
+				compile(context, content, open, close);
 			} catch (Exception error) {
 				errors_ ~= format("%s: %s", mgr_.loc(context.loc), error.msg);
 			}
-
-			context.advance(indexClose + close.length);
 		}
 		context.expectClosed();
 
@@ -296,6 +297,13 @@ private:
 			auto column = values.front.splitter(' ').front.to!uint;
 			context.loc = SourceLoc(id, line, column);
 			break;
+		case "raw":
+			outputText(context);
+			auto length = values.front.to!size_t;
+			values.popFront;
+			outputRawText(context, context.remaining()[0..length]);
+			context.advance(length);
+			break;
 		default:
 			throw new ParserException(context.loc, format("unknown meta type '%s'", type));
 		}
@@ -389,6 +397,10 @@ private:
 				insert_.children ~= create!Output(Token(context.loc), create!Constant(Token(text, Token.LiteralKind.String, 0, 0, context.loc)));
 			text_.length = 0;
 		}
+	}
+
+	void outputRawText(Context context, string text) {
+		insert_.children ~= create!Output(Token(context.loc), create!Constant(Token(text, Token.LiteralKind.String, 0, 0, context.loc)));
 	}
 
 	Source source_;

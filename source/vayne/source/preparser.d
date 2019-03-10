@@ -15,7 +15,6 @@ import vayne.source.token;
 
 struct PreParserOptions {
 	bool lineNumbers;
-	bool verboseIncludes;
 }
 
 
@@ -87,7 +86,7 @@ private:
 			auto indexOpen = remaining.indexOf("{{");
 			while (indexOpen != -1) {
 				auto tag = remaining[indexOpen + 2..indexOpen + 2 + 1];
-				if ((tag == "#") || (tag == "&") || (tag == "!"))
+				if ((tag == "#") || (tag == "&") || (tag == "%") || (tag == "!"))
 					break;
 				indexOpen = remaining.indexOf("{{", indexOpen + 2);
 			}
@@ -122,23 +121,32 @@ private:
 	}
 
 	string include(string content, Context context) {
-		auto embed = ((content.length > 1) && (content[1] == content[0])) ? 1 : 0;
-		auto source = mgr_.open(content[1 + embed..$].strip, embed != 0, context.source.id);
+		auto source = mgr_.open(content[1..$].strip, false, context.source.id);
 		mgr_.dependency(context.source.id, source.id, context.loc);
 
-		string result;
-		if (!embed) {
-			result = parse(source, SourceLoc(source.id, 1, 0));
-		} else {
-			auto name = mgr_.name(source.id);
-			result = format("data:%s;base64,%s", name.mimeType, encode(source.buffer));
-		}
+		auto result = parse(source, SourceLoc(source.id, 1, 0));
 
 		if (needsLineNumbers(result))
 			result ~= sourceInfo(context.loc);
+		return result;
+	}
 
-		if (needsIncludeNames())
-			result = format("<!-- begin include %s -->%s<!-- end include %s -->", content, result, content);
+	string embed(string content, Context context) {
+		auto mime = ((content.length > 1) && (content[1] == content[0])) ? 1 : 0;
+		auto source = mgr_.open(content[1 + mime..$].strip, true, context.source.id);
+		mgr_.dependency(context.source.id, source.id, context.loc);
+
+		string result;
+		if (mime) {
+			result = format("data:%s;base64,%s", mgr_.name(source.id).mimeType, encode(source.buffer));
+		} else {
+			result = cast(string)source.buffer;
+		}
+
+		result = rawInfo(result.length) ~ result;
+
+		if (needsLineNumbers(result))
+			result ~= sourceInfo(context.loc);
 		return result;
 	}
 
@@ -295,9 +303,6 @@ private:
 					auto result = parse(source, SourceLoc(source.id, pdef.loc.line, pdef.loc.column));
 					if (needsLineNumbers(result))
 						result ~= sourceInfo(context.loc);
-
-					if (needsIncludeNames())
-						result = format("<!-- begin macro #%s -->%s<!-- end macro #%s -->", name, result, name);
 					return result;
 				}
 			}
@@ -363,6 +368,8 @@ private:
 				return comment(content, context);
 			case '&':
 				return include(content, context).strip;
+			case '%':
+				return embed(content, context);
 			case '#':
 				return define(content, context).strip;
 			default:
@@ -376,12 +383,12 @@ private:
 		return options_.lineNumbers && !isAllWhite(content);
 	}
 
-	auto needsIncludeNames() {
-		return options_.verboseIncludes;
-	}
-
 	string sourceInfo(SourceLoc loc) {
 		return format("{{;src:%d:%d:%d %s}}", loc.id, loc.line, loc.column, mgr_.name(loc.id));
+	}
+
+	string rawInfo(size_t length) {
+		return format("{{;raw:%s}}", length);
 	}
 
 private:
