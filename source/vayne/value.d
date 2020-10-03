@@ -249,6 +249,14 @@ struct Value {
 
 
 	private void bindMembers(T)(ref T x) {
+		//bind enum members...
+		foreach(Member; __traits(allMembers, T)) {
+            static if(is(typeof(__traits(getMember, T, Member)) == enum)) {
+                storage_.o[name] = cast(OriginalType!(typeof(__traits(getMember, T, Member)))) Value(__traits(getMember, x, Member));
+			}
+        }
+
+		//bind others...
 		foreach (Member; FieldNameTuple!T) {
 			static if (Member != "" && is(typeof(__traits(getMember, x, Member))) && __traits(getProtection, __traits(getMember, x, Member)) == "public" && !hasUDA!(__traits(getMember, T, Member), IgnoreAttribute)) {
 				static if (hasUDA!(__traits(getMember, x, Member), NameAttribute)) {
