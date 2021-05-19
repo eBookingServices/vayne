@@ -90,6 +90,8 @@ hash_t hashOf(T)(auto ref T x, size_t seed = 0) if (!is(T == enum) && __traits(i
 hash_t hash(T)(in const(T)* x, size_t len, size_t seed = 0) {
 	version(X86_64) {
 		return hash64(x, len, seed);
+	} else version(AArch64) {
+		return hash64(x, len, seed);
 	} else {
 		return hash32(x, len, seed);
 	}
